@@ -600,6 +600,11 @@ export function consumeCommandSubstitution(
  * quotes and `$(...)` command substitutions. Unquotes simple quoted words.
  */
 export function splitShellWords(segment: string): string[] {
+	// Fast path: no quoting characters at all
+	if (!/['"`$\\]/.test(segment)) {
+		return segment.trim().split(/\s+/).filter(Boolean)
+	}
+
 	const words: string[] = []
 	let current = ''
 	let inSingle = false

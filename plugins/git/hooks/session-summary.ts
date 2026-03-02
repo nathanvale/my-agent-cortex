@@ -23,7 +23,7 @@ function isPreCompactHookInput(value: unknown): value is PreCompactHookInput {
 	if (!('cwd' in value) || typeof value.cwd !== 'string') return false
 	if (
 		'transcript_path' in value &&
-		typeof value.transcript_path !== 'undefined' &&
+		value.transcript_path !== undefined &&
 		typeof value.transcript_path !== 'string'
 	) {
 		return false
@@ -130,11 +130,13 @@ export function extractFromTranscript(transcriptText: string): CortexEntry[] {
 		}
 	}
 
-	const sentences = textContent
-		.join('\n')
-		.split(/[.!?\n]+/)
-		.map((sentence) => sentence.trim())
-		.filter((sentence) => sentence.length > 10)
+	const sentences: string[] = []
+	for (const text of textContent) {
+		for (const sentence of text.split(/[.!?\n]+/)) {
+			const trimmed = sentence.trim()
+			if (trimmed.length > 10) sentences.push(trimmed)
+		}
+	}
 
 	for (const sentence of sentences) {
 		for (const pattern of SALIENCE_PATTERNS) {

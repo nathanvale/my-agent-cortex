@@ -6,7 +6,6 @@
  * Stop hook that creates WIP checkpoints for tracked changes.
  */
 
-import { readFile } from 'node:fs/promises'
 import { postEvent } from './event-bus-client'
 import { PROTECTED_BRANCHES } from './git-policy'
 import type { FileStatusCounts } from './git-status-parser'
@@ -29,7 +28,7 @@ function isStopHookInput(value: unknown): value is StopHookInput {
 		return false
 	if (
 		'stop_hook_active' in value &&
-		typeof value.stop_hook_active !== 'undefined' &&
+		value.stop_hook_active !== undefined &&
 		typeof value.stop_hook_active !== 'boolean'
 	) {
 		return false
@@ -51,22 +50,24 @@ export async function getLastUserPrompt(
 	transcriptPath: string,
 ): Promise<string | null> {
 	try {
-		const content = await readFile(transcriptPath, 'utf-8')
-		const lines = content.split('\n').filter((line) => line.trim() !== '')
+		const file = Bun.file(transcriptPath)
+		const size = file.size
+		if (size === 0) return null
+		const chunkSize = Math.min(size, 10_240)
+		const tail = await file.slice(size - chunkSize, size).text()
+		const lines = tail.split('\n').filter((line) => line.trim() !== '')
 
-		let lastUserPrompt: string | null = null
-		for (const line of lines) {
+		for (let i = lines.length - 1; i >= 0; i--) {
 			try {
-				const parsed = JSON.parse(line)
+				const parsed = JSON.parse(lines[i]!)
 				if (parsed.type === 'user' && parsed.message?.content) {
-					lastUserPrompt = parsed.message.content
+					return parsed.message.content
 				}
 			} catch {
-				// skip malformed lines
+				// skip malformed/partial lines
 			}
 		}
-
-		return lastUserPrompt
+		return null
 	} catch {
 		return null
 	}
