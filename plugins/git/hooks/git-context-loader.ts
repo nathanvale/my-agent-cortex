@@ -131,8 +131,15 @@ export function formatAdditionalContext(
 	routing += '| Create PR | /git:create-pr (push + gh pr create) |\n'
 	routing +=
 		'| Manage worktrees | /git:worktree (create, list, delete, sync, clean, status) |\n'
+	routing += '| Review a PR | /git:review-pr (review a GitHub pull request) |\n'
+	routing += '| Explore history | /git:history (explore git commit history) |\n'
 	routing +=
-		'| Anything else git | invoke git-expert skill (history, changelog, compare, review) |'
+		'| Generate changelog | /git:changelog (changelog from conventional commits) |\n'
+	routing +=
+		'| Compare branches | /git:compare (compare branches with AI summary) |\n'
+	routing +=
+		'| Session activity | /git:session-log (git activity during this Claude session) |\n'
+	routing += '| Anything else git | invoke git-expert skill |'
 	sections.push(routing)
 
 	// Section 3: Safety rules -- critical after compaction when Claude loses memory

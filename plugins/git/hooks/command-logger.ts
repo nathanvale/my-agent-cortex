@@ -85,8 +85,14 @@ if (import.meta.main) {
 		const logDir = join(homedir(), '.claude', 'logs')
 		const logPath = join(logDir, 'git-command-log.jsonl')
 
-		await mkdir(logDir, { recursive: true })
-		await appendFile(logPath, `${JSON.stringify(entry)}\n`)
+		try {
+			await appendFile(logPath, `${JSON.stringify(entry)}\n`)
+		} catch (err: unknown) {
+			if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+				await mkdir(logDir, { recursive: true })
+				await appendFile(logPath, `${JSON.stringify(entry)}\n`)
+			}
+		}
 
 		try {
 			await postEvent(entry.cwd, 'command.executed', {

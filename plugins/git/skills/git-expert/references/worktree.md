@@ -15,7 +15,7 @@ Create, list, and delete git worktrees with automatic file copying.
 
 1. **If no `.worktrees.json` exists**, run the CLI `init` command first and show the user what was auto-detected. Ask if they want to adjust before continuing.
 2. **Suggest a branch name** if the user gave a description instead of a branch name (same logic as before)
-3. **Confirm** the branch name with the user
+3. **Confirm** the branch name with the user. When a branch name is provided in `$ARGUMENTS`, skip the branch name confirmation.
 4. **Execute**:
    ```bash
    bunx @side-quest/git worktree create <branch-name> --no-fetch --no-install
@@ -49,7 +49,7 @@ Remove a worktree safely:
 3. **Warn** the user if:
    - The worktree has uncommitted changes (dirty) — suggest committing first or using `--force`
    - The branch is not merged — warn that work may be lost
-4. **Ask** if the branch should also be deleted
+4. **Ask** if the branch should also be deleted. When `$ARGUMENTS` contains `--force`, skip confirmation. When `$ARGUMENTS` contains `--delete-branch`, also delete the branch without asking.
 5. **Execute**:
    ```bash
    bunx @side-quest/git worktree delete <branch-name> [--force] [--delete-branch]

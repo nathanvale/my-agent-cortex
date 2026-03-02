@@ -698,6 +698,17 @@ export function normalizeExecutableName(head: string | null): string | null {
 // Git invocation parsing
 // ---------------------------------------------------------------------------
 
+/** Git global options that consume a following value argument. */
+const GIT_OPTIONS_WITH_VALUE = new Set([
+	'-C',
+	'-c',
+	'--git-dir',
+	'--work-tree',
+	'--namespace',
+	'--super-prefix',
+	'--config-env',
+])
+
 /**
  * Parses a shell segment to extract a git subcommand and its arguments,
  * skipping global git options (e.g., `-C`, `--git-dir`). Returns null if
@@ -708,16 +719,6 @@ export function parseGitInvocation(segment: string): GitInvocation | null {
 	if (cmdIndex === -1 || normalizeExecutableName(head) !== 'git') return null
 
 	// Skip git global options before subcommand.
-	const optionsWithValue = new Set([
-		'-C',
-		'-c',
-		'--git-dir',
-		'--work-tree',
-		'--namespace',
-		'--super-prefix',
-		'--config-env',
-	])
-
 	let i = cmdIndex + 1
 	while (i < words.length) {
 		const word = words[i] || ''
@@ -730,14 +731,14 @@ export function parseGitInvocation(segment: string): GitInvocation | null {
 		if (!word.startsWith('-')) break
 
 		if (
-			optionsWithValue.has(word) ||
+			GIT_OPTIONS_WITH_VALUE.has(word) ||
 			word.startsWith('--git-dir=') ||
 			word.startsWith('--work-tree=') ||
 			word.startsWith('--namespace=') ||
 			word.startsWith('--super-prefix=') ||
 			word.startsWith('--config-env=')
 		) {
-			i += optionsWithValue.has(word) ? 2 : 1
+			i += GIT_OPTIONS_WITH_VALUE.has(word) ? 2 : 1
 			continue
 		}
 

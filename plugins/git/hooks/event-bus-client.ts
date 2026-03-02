@@ -68,6 +68,7 @@ function hashGitRoot(gitRoot: string): string {
 	return createHash('sha256').update(normalized).digest('hex').slice(0, 12)
 }
 
+/** Returns a sanitized, hash-suffixed repo key safe for use in file paths. */
 export function getRepoKeyFromGitRoot(gitRoot: string): string {
 	const baseName = gitRoot.split(/[/\\]/).pop() || 'unknown'
 	const safeBaseName = sanitizeRepoName(baseName)
@@ -123,7 +124,6 @@ async function postEventInner(
 	signal: AbortSignal,
 ): Promise<void> {
 	const { repoName, gitRoot } = await getRepoIdentity(cwd)
-	const safeRepoName = sanitizeRepoName(repoName)
 
 	// Prefer process.env.HOME (allows test overrides), fall back to homedir()
 	// for non-interactive contexts where HOME is unset (launchd, cron).
@@ -132,7 +132,8 @@ async function postEventInner(
 	// Primary: global observability server
 	const globalPortFile = `${home}/.cache/side-quest-observability/events.port`
 	// Fallback: per-repo path (V1 convention)
-	const repoPortFile = `${home}/.cache/side-quest-git/${safeRepoName}/events.port`
+	// repoName is already sanitized by getRepoKeyFromGitRoot
+	const repoPortFile = `${home}/.cache/side-quest-git/${repoName}/events.port`
 
 	const globalPort = await readValidPort(globalPortFile)
 	const repoPort = await readValidPort(repoPortFile)

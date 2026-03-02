@@ -107,6 +107,7 @@ Review a GitHub pull request with inline comments.
 
 **Key rules:**
 - Draft → Show → Approve → Post (never post without user approval)
+- When `$ARGUMENTS` contains `--submit`, post the review without the interactive approval gate.
 - Batch all comments into one review (no scattered notifications)
 - Include `file:line` references for every finding
 
@@ -137,8 +138,8 @@ Generate a changelog from conventional commits.
    ### Fixed
    - Description (commit-hash)
    ```
-7. **Present to user** for approval
-8. **On approval**, prepend to CHANGELOG.md (create if missing)
+7. **Present to user** for approval. When `$ARGUMENTS` contains `--write`, skip the approval step and write directly.
+8. **On approval** (or `--write`), prepend to CHANGELOG.md (create if missing)
 9. **Optionally stage** the file: `git add CHANGELOG.md`
 
 ## Compare
