@@ -147,6 +147,8 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-if-includes'],
 		['git push origin --force-with-lease'],
 		['git push upstream --force-if-includes'],
+		['env FOO=1 git push --force-with-lease'],
+		['sh -c "git push --force-if-includes"'],
 	])('detects implicit lease-force push targeting upstream branch: %s', (command) => {
 		expect(hasImplicitProtectedBranchForceLeasePush(command)).toBe(true)
 	})
@@ -227,7 +229,10 @@ describe('git push mirror/prune protections', () => {
 describe('protected-branch commit action detection', () => {
 	test.each([
 		['git commit -m "feat: x"'],
+		['env FOO=1 git commit -m "feat: x"'],
+		['sh -c "git commit -m \'feat: x\'"'],
 		['git cherry-pick abc123'],
+		['env FOO=1 git cherry-pick abc123'],
 		['git revert abc123'],
 		['git merge feature/foo'],
 		['git merge --no-ff feature/foo'],
@@ -646,6 +651,8 @@ describe('issue 4: git global options do not bypass safety checks', () => {
 		['/usr/bin/git commit -m "feat: test"', true],
 		['git -c core.editor=true commit -n -m "wip: checkpoint"', true],
 		['git diff --quiet || git -C /repo commit -m "feat: test"', true],
+		['env FOO=1 git commit -m "feat: test"', true],
+		['env -u CI git commit --no-verify -m "chore(wip): checkpoint"', true],
 		['command git commit -m "feat: test"', true],
 		['time git commit -m "feat: test"', true],
 		['nice -n 10 git commit -m "feat: test"', true],

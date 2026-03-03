@@ -18,6 +18,7 @@ import { getCurrentBranch } from './git-utils'
 import {
 	extractCommandSubstitutions,
 	extractWrappedShellCommand,
+	type GitInvocation,
 	getCommandWords,
 	normalizeExecutableName,
 	parseGitInvocation,
@@ -269,6 +270,41 @@ function checkCommandInternal(
 		}
 	}
 	return checkParsedSegments(segments, depth)
+}
+
+/**
+ * Collects direct and nested git invocations from parsed shell segments.
+ * This mirrors safety recursion paths (wrappers + command substitutions) so
+ * commit/protected-branch checks cannot be bypassed through indirection.
+ */
+function collectGitInvocations(segments: string[], depth = 0): GitInvocation[] {
+	if (depth > 4) return []
+
+	const invocations: GitInvocation[] = []
+	for (const segment of segments) {
+		const direct = parseGitInvocation(segment)
+		if (direct) invocations.push(direct)
+
+		const wrapped = extractWrappedShellCommand(segment)
+		if (wrapped) {
+			const wrappedSplit = splitShellSegments(wrapped)
+			if (!wrappedSplit.unbalanced) {
+				invocations.push(
+					...collectGitInvocations(wrappedSplit.segments, depth + 1),
+				)
+			}
+		}
+
+		for (const nested of extractCommandSubstitutions(segment)) {
+			const nestedSplit = splitShellSegments(nested)
+			if (nestedSplit.unbalanced) continue
+			invocations.push(
+				...collectGitInvocations(nestedSplit.segments, depth + 1),
+			)
+		}
+	}
+
+	return invocations
 }
 
 /**
@@ -724,16 +760,16 @@ export function isCommitCommand(
 	hasWipMessage: boolean
 } {
 	const segments = preParsedSegments ?? splitShellSegments(command).segments
-	const commitSegments = segments
-		.map((seg) => ({ seg, parsed: parseGitInvocation(seg) }))
-		.filter(({ parsed }) => parsed?.subcommand === 'commit')
+	const commitInvocations = collectGitInvocations(segments).filter(
+		(invocation) => invocation.subcommand === 'commit',
+	)
 
-	if (commitSegments.length === 0) {
+	if (commitInvocations.length === 0) {
 		return { isCommit: false, hasNoVerify: false, hasWipMessage: false }
 	}
 
-	const commitStates = commitSegments.map(({ parsed }) => {
-		const args = parsed?.args ?? []
+	const commitStates = commitInvocations.map((invocation) => {
+		const args = invocation.args ?? []
 		const hasNoVerify =
 			hasLongFlag(args, '--no-verify') || hasShortFlag(args, 'n')
 		const commitMessages = extractCommitMessages(args)
@@ -762,12 +798,9 @@ export function hasProtectedBranchCommitAction(
 	preParsedSegments?: string[],
 ): boolean {
 	const segments = preParsedSegments ?? splitShellSegments(command).segments
+	const invocations = collectGitInvocations(segments)
 
-	for (const segment of segments) {
-		const parsed = parseGitInvocation(segment)
-		if (!parsed) continue
-
-		const { subcommand, args } = parsed
+	for (const { subcommand, args } of invocations) {
 		if (subcommand === 'commit') return true
 
 		if (subcommand === 'cherry-pick' || subcommand === 'revert') {
@@ -809,12 +842,12 @@ export function hasImplicitProtectedBranchForceLeasePush(
 	preParsedSegments?: string[],
 ): boolean {
 	const segments = preParsedSegments ?? splitShellSegments(command).segments
+	const invocations = collectGitInvocations(segments)
 
-	for (const segment of segments) {
-		const parsed = parseGitInvocation(segment)
-		if (!parsed || parsed.subcommand !== 'push') continue
+	for (const invocation of invocations) {
+		if (invocation.subcommand !== 'push') continue
 
-		const args = parsed.args
+		const args = invocation.args
 		const hasForceWithLease =
 			hasLongFlag(args, '--force-with-lease') ||
 			args.some((a) => a.startsWith('--force-with-lease='))

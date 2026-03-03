@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -53,6 +53,7 @@ function runSafetyHook(params: {
 	cwd: string
 	mode: 'strict' | 'commit-guard' | 'advisory'
 	protectedBranches?: string
+	eventLogPath?: string
 }): HookRunResult {
 	const payload = JSON.stringify(
 		params.toolName === 'Write' || params.toolName === 'Edit'
@@ -74,6 +75,7 @@ function runSafetyHook(params: {
 			CLAUDE_GIT_SAFETY_MODE: params.mode,
 			CLAUDE_PROTECTED_BRANCHES:
 				params.protectedBranches ?? process.env.CLAUDE_PROTECTED_BRANCHES ?? '',
+			CLAUDE_HOOK_EVENT_LOG: params.eventLogPath,
 		},
 		stdin: new TextEncoder().encode(payload),
 		stdout: 'pipe',
@@ -84,6 +86,21 @@ function runSafetyHook(params: {
 		stdout: new TextDecoder().decode(proc.stdout),
 		stderr: new TextDecoder().decode(proc.stderr),
 	}
+}
+
+function readEventTypes(path: string): string[] {
+	let content = ''
+	try {
+		content = readFileSync(path, 'utf8').trim()
+	} catch {
+		return []
+	}
+	if (!content) return []
+	return content
+		.split('\n')
+		.map((line) => JSON.parse(line) as { type?: string })
+		.map((e) => e.type || '')
+		.filter(Boolean)
 }
 
 afterEach(() => {
@@ -107,13 +124,16 @@ describe('git-safety runtime mode behavior', () => {
 
 	test('commit-guard allows destructive command that strict would deny', () => {
 		const { cwd } = createTempRepo()
+		const eventLogPath = join(cwd, 'events.jsonl')
 		const result = runSafetyHook({
 			command: 'git reset --hard',
 			cwd,
 			mode: 'commit-guard',
+			eventLogPath,
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).not.toContain('"permissionDecision":"deny"')
+		expect(readEventTypes(eventLogPath)).toContain('safety.warn')
 	})
 
 	test('commit-guard still denies commit on protected branch', () => {
@@ -131,14 +151,18 @@ describe('git-safety runtime mode behavior', () => {
 
 	test('advisory does not deny protected-branch commit attempts', () => {
 		const { cwd, branch } = createTempRepo()
+		const eventLogPath = join(cwd, 'events.jsonl')
 		const result = runSafetyHook({
 			command: 'git commit -m "feat: test"',
 			cwd,
 			mode: 'advisory',
 			protectedBranches: branch,
+			eventLogPath,
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).not.toContain('"permissionDecision":"deny"')
+		// Advisory should not emit safety.warn for non-blocked commands.
+		expect(readEventTypes(eventLogPath)).not.toContain('safety.warn')
 	})
 
 	test('strict denies protected file edits', () => {
@@ -155,14 +179,17 @@ describe('git-safety runtime mode behavior', () => {
 
 	test('commit-guard does not deny protected file edits', () => {
 		const { cwd } = createTempRepo()
+		const eventLogPath = join(cwd, 'events.jsonl')
 		const result = runSafetyHook({
 			cwd,
 			mode: 'commit-guard',
 			toolName: 'Write',
 			filePath: '.env',
+			eventLogPath,
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).not.toContain('"permissionDecision":"deny"')
+		expect(readEventTypes(eventLogPath)).toContain('safety.warn')
 	})
 
 	test('advisory does not deny protected file edits', () => {
