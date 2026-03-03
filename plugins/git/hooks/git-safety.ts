@@ -125,6 +125,18 @@ function hasRecursiveForceRmArgs(args: string[]): boolean {
 	return hasRecursive && hasForce
 }
 
+function normalizeBranchRef(ref: string): string {
+	let value = ref.trim()
+	if (value.startsWith('+')) value = value.slice(1)
+	if (value.startsWith('refs/heads/')) value = value.slice('refs/heads/'.length)
+	return value
+}
+
+function isProtectedBranchRef(ref: string): boolean {
+	const normalized = normalizeBranchRef(ref)
+	return PROTECTED_BRANCHES.includes(normalized)
+}
+
 /**
  * Checks a shell command string for destructive operations that should be
  * blocked. Recursively analyzes piped segments, shell wrappers, and command
@@ -205,6 +217,8 @@ function checkParsedSegments(
 					hasLongFlag(args, '--force-with-lease') ||
 					args.some((a) => a.startsWith('--force-with-lease='))
 				const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
+				const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
+				const refspecArgs = nonFlagArgs.length > 1 ? nonFlagArgs.slice(1) : []
 				if (hasForce) {
 					return {
 						blocked: true,
@@ -213,21 +227,44 @@ function checkParsedSegments(
 					}
 				}
 				if (hasForceWithLease || hasForceIfIncludes) {
-					const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
-					const targetsProtected = nonFlagArgs.some((a) =>
-						PROTECTED_BRANCHES.some(
-							(branch) =>
-								a === branch ||
-								a.endsWith(`:${branch}`) ||
-								a.startsWith(`${branch}:`),
-						),
-					)
+					const targetsProtected = refspecArgs.some((arg) => {
+						const target = arg.includes(':')
+							? (arg.split(':').at(-1) ?? '')
+							: arg
+						return isProtectedBranchRef(target)
+					})
 					if (targetsProtected) {
 						return {
 							blocked: true,
 							reason:
 								'Force push (even with --force-with-lease) to a protected branch can destroy shared history. Push to a feature branch and open a PR instead.',
 						}
+					}
+				}
+
+				// Block remote deletion of protected branches (plain or fully-qualified refs)
+				if (hasLongFlag(args, '--delete')) {
+					const deleteTargets = refspecArgs.map((arg) =>
+						normalizeBranchRef(arg),
+					)
+					if (deleteTargets.some((target) => isProtectedBranchRef(target))) {
+						return {
+							blocked: true,
+							reason:
+								'Deleting protected remote branches is blocked. Push to feature branches and use PR workflows.',
+						}
+					}
+				}
+
+				// Also block deletion refspec form: git push origin :main / :refs/heads/main
+				const deletionTargets = refspecArgs
+					.filter((arg) => arg.startsWith(':'))
+					.map((arg) => normalizeBranchRef(arg.slice(1)))
+				if (deletionTargets.some((target) => isProtectedBranchRef(target))) {
+					return {
+						blocked: true,
+						reason:
+							'Deleting protected remote branches is blocked. Push to feature branches and use PR workflows.',
 					}
 				}
 			}

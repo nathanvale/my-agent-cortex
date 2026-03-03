@@ -118,6 +118,8 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-with-lease origin master'],
 		['git push --force-if-includes origin main'],
 		['git push --force-with-lease=origin/main origin main'],
+		['git push --force-with-lease origin HEAD:refs/heads/main'],
+		['git push --force-if-includes origin HEAD:refs/heads/master'],
 	])('blocks on protected branch: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(true)
@@ -148,6 +150,31 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-with-lease origin main'],
 	])('does not mark explicit refspec pushes as implicit: %s', (command) => {
 		expect(hasImplicitProtectedBranchForceLeasePush(command)).toBe(false)
+	})
+})
+
+describe('git push protected branch deletion', () => {
+	test.each([
+		['git push origin --delete main'],
+		['git push origin --delete master'],
+		['git push origin --delete refs/heads/main'],
+		['git push origin --delete refs/heads/master'],
+		['git push origin :main'],
+		['git push origin :refs/heads/main'],
+		['git push upstream :refs/heads/master'],
+	])('blocks protected branch deletion: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toContain('Deleting protected remote branches')
+	})
+
+	test.each([
+		['git push origin --delete feat/my-feature'],
+		['git push origin --delete refs/heads/feat/my-feature'],
+		['git push origin :feat/my-feature'],
+	])('allows non-protected branch deletion: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(false)
 	})
 })
 
