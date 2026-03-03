@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { appendFileSync } from 'node:fs'
 
 /** Event types emitted by hook lifecycle */
 export type HookEventType =
@@ -25,7 +26,18 @@ export async function postEvent(
 	_type: HookEventType,
 	_data: Record<string, unknown>,
 	_correlationId?: string,
-): Promise<void> {}
+): Promise<void> {
+	const capturePath = process.env.CLAUDE_HOOK_EVENT_LOG
+	if (!capturePath) return
+	const line = JSON.stringify({
+		type: _type,
+		cwd: _cwd,
+		data: _data,
+		correlationId: _correlationId,
+		timestamp: new Date().toISOString(),
+	})
+	appendFileSync(capturePath, `${line}\n`, 'utf8')
+}
 
 /** Sanitize repo name to prevent path traversal. */
 export function sanitizeRepoName(name: string): string {
