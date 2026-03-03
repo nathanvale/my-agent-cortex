@@ -261,7 +261,7 @@ function checkParsedSegments(
 				}
 
 				// Block remote deletion of protected branches (plain or fully-qualified refs)
-				if (hasLongFlag(args, '--delete')) {
+				if (hasLongFlag(args, '--delete') || hasShortFlag(args, 'd')) {
 					const deleteTargets = refspecArgs.map((arg) =>
 						normalizeBranchRef(arg),
 					)

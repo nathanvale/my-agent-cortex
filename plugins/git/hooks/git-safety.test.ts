@@ -164,6 +164,10 @@ describe('git push protected branch deletion', () => {
 		['git push origin --delete refs/heads/master'],
 		['git push --delete main'],
 		['git push --delete refs/heads/main'],
+		['git push -d main'],
+		['git push -d refs/heads/main'],
+		['git push -d origin main'],
+		['git push -d origin refs/heads/main'],
 		['git push origin :main'],
 		['git push origin :refs/heads/main'],
 		['git push upstream :refs/heads/master'],
@@ -178,6 +182,8 @@ describe('git push protected branch deletion', () => {
 	test.each([
 		['git push origin --delete feat/my-feature'],
 		['git push origin --delete refs/heads/feat/my-feature'],
+		['git push -d feat/my-feature'],
+		['git push -d origin feat/my-feature'],
 		['git push origin :feat/my-feature'],
 	])('allows non-protected branch deletion: %s', (command) => {
 		const result = checkCommand(command)
