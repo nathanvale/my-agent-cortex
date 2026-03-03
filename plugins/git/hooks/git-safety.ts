@@ -247,11 +247,27 @@ function checkParsedSegments(
 				const hasForceByRefspec = getPushRefspecArgs(args).some((arg) =>
 					arg.startsWith('+'),
 				)
+				const hasMirror = hasLongFlag(args, '--mirror')
+				const hasPrune = hasLongFlag(args, '--prune')
 				const hasForceWithLease =
 					hasLongFlag(args, '--force-with-lease') ||
 					args.some((a) => a.startsWith('--force-with-lease='))
 				const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
 				const refspecArgs = getPushRefspecArgs(args)
+				if (hasMirror) {
+					return {
+						blocked: true,
+						reason:
+							'git push --mirror can overwrite and delete remote refs destructively. Use explicit feature-branch pushes instead.',
+					}
+				}
+				if (hasPrune) {
+					return {
+						blocked: true,
+						reason:
+							'git push --prune can delete remote refs unexpectedly. Use explicit, reviewed branch deletion workflows instead.',
+					}
+				}
 				if (hasForce || hasForceByRefspec) {
 					return {
 						blocked: true,

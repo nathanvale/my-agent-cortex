@@ -206,6 +206,19 @@ describe('git push force by +refspec', () => {
 	})
 })
 
+describe('git push mirror/prune protections', () => {
+	test.each([
+		['git push --mirror origin'],
+		['git push --mirror'],
+		['git push --prune origin'],
+		['git push --prune'],
+	])('blocks destructive push mode: %s', (command) => {
+		const result = checkCommand(command)
+		expect(result.blocked).toBe(true)
+		expect(result.reason).toMatch(/--mirror|--prune/)
+	})
+})
+
 describe('protected-branch commit action detection', () => {
 	test.each([
 		['git commit -m "feat: x"'],
