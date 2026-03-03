@@ -1,5 +1,5 @@
 ---
-status: deferred
+status: complete
 priority: p2
 issue_id: "048"
 tags: [code-review, simplicity]

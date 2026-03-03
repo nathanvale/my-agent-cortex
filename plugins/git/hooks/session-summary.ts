@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 
 /**
- * Session Summary Hook (Cortex Pattern)
+ * Session Summary Hook
  *
- * PreCompact hook that extracts salient content and appends summary artifacts.
+ * PreCompact hook that captures git state and appends a summary artifact
+ * so the agent retains repo context after compaction.
  */
 
-import { appendFile, mkdir, readFile } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { getRepoKeyFromGitRoot, postEvent } from './event-bus-client'
@@ -29,144 +30,6 @@ function isPreCompactHookInput(value: unknown): value is PreCompactHookInput {
 		return false
 	}
 	return true
-}
-
-export interface CortexEntry {
-	timestamp: string
-	type: 'decision' | 'error_fix' | 'learning' | 'preference'
-	salience: number
-	content: string
-	context?: string
-}
-
-interface SaliencePattern {
-	type: CortexEntry['type']
-	salience: number
-	patterns: RegExp[]
-}
-
-const SALIENCE_PATTERNS: SaliencePattern[] = [
-	{
-		type: 'decision',
-		salience: 0.9,
-		patterns: [
-			/decided to\s+(.+)/i,
-			/going with\s+(.+)/i,
-			/the approach is\s+(.+)/i,
-			/we(?:'ll| will) use\s+(.+)/i,
-			/let(?:'s| us) go with\s+(.+)/i,
-		],
-	},
-	{
-		type: 'error_fix',
-		salience: 0.8,
-		patterns: [
-			/(?:fixed|resolved|solved)\s+(?:by|with|the)\s+(.+)/i,
-			/the (?:fix|solution) (?:was|is)\s+(.+)/i,
-			/error was caused by\s+(.+)/i,
-			/root cause(?::| was)\s+(.+)/i,
-		],
-	},
-	{
-		type: 'learning',
-		salience: 0.7,
-		patterns: [
-			/(?:TIL|learned that)\s+(.+)/i,
-			/turns out\s+(.+)/i,
-			/the issue was\s+(.+)/i,
-			/(?:discovered|found out)\s+(?:that\s+)?(.+)/i,
-		],
-	},
-	{
-		type: 'preference',
-		salience: 0.7,
-		patterns: [
-			/always\s+(.+)/i,
-			/never\s+(.+)/i,
-			/prefer\s+(.+)/i,
-			/(?:I|we) want\s+(.+)/i,
-		],
-	},
-]
-
-/**
- * Scans a JSONL conversation transcript for salient patterns (decisions,
- * error fixes, learnings, preferences) and returns structured cortex entries.
- * These survive compaction so valuable context is not lost between sessions.
- */
-export function extractFromTranscript(transcriptText: string): CortexEntry[] {
-	const entries: CortexEntry[] = []
-	const now = new Date().toISOString()
-	const lines = transcriptText.split('\n').filter((line) => line.trim() !== '')
-	const textContent: string[] = []
-
-	for (const line of lines) {
-		try {
-			const parsed = JSON.parse(line)
-			if (
-				parsed.type === 'user' &&
-				typeof parsed.message?.content === 'string'
-			) {
-				textContent.push(parsed.message.content)
-			}
-			if (
-				parsed.type === 'assistant' &&
-				typeof parsed.message?.content === 'string'
-			) {
-				textContent.push(parsed.message.content)
-			}
-			if (
-				parsed.type === 'assistant' &&
-				Array.isArray(parsed.message?.content)
-			) {
-				for (const block of parsed.message.content) {
-					if (block?.type === 'text' && typeof block.text === 'string') {
-						textContent.push(block.text)
-					}
-				}
-			}
-		} catch {
-			// skip malformed lines
-		}
-	}
-
-	const sentences: string[] = []
-	for (const text of textContent) {
-		for (const sentence of text.split(/[.!?\n]+/)) {
-			const trimmed = sentence.trim()
-			if (trimmed.length > 10) sentences.push(trimmed)
-		}
-	}
-
-	for (const sentence of sentences) {
-		for (const pattern of SALIENCE_PATTERNS) {
-			for (const regex of pattern.patterns) {
-				const match = sentence.match(regex)
-				if (!match?.[1]) {
-					continue
-				}
-
-				entries.push({
-					timestamp: now,
-					type: pattern.type,
-					salience: pattern.salience,
-					content: match[1].trim().slice(0, 200),
-					context: sentence.slice(0, 300),
-				})
-				break
-			}
-		}
-	}
-
-	const seen = new Set<string>()
-	return entries.filter((entry) => {
-		const key = `${entry.type}:${entry.content}`
-		if (seen.has(key)) {
-			return false
-		}
-		seen.add(key)
-		return true
-	})
 }
 
 async function getGitStateSummary(cwd: string): Promise<string> {
@@ -246,26 +109,6 @@ if (import.meta.main) {
 		}
 
 		const repoName = getRepoKeyFromGitRoot(gitRoot)
-		let cortexEntries: CortexEntry[] = []
-
-		if (input.transcript_path) {
-			try {
-				const transcriptText = await readFile(input.transcript_path, 'utf-8')
-				cortexEntries = extractFromTranscript(transcriptText)
-			} catch {
-				// proceed with git state only
-			}
-		}
-
-		if (cortexEntries.length > 0) {
-			const cortexDir = join(homedir(), '.claude', 'cortex')
-			await ensureDirectory(cortexDir)
-			const cortexPath = join(cortexDir, `${repoName}.jsonl`)
-			const lines = cortexEntries
-				.map((entry) => `${JSON.stringify(entry)}\n`)
-				.join('')
-			await appendFile(cortexPath, lines)
-		}
 
 		const gitState = await getGitStateSummary(input.cwd)
 		const summaryDir = join(homedir(), '.claude', 'session-summaries')
@@ -284,15 +127,6 @@ if (import.meta.main) {
 			'workflow skill handles: commits, PRs, history, worktrees, changelog, branch compare, squash, safety guards',
 		]
 
-		if (cortexEntries.length > 0) {
-			contextParts.push(
-				`Extracted ${cortexEntries.length} salient items to cortex:`,
-			)
-			for (const entry of cortexEntries.slice(0, 5)) {
-				contextParts.push(`  [${entry.type}] ${entry.content}`)
-			}
-		}
-
 		// Use plain stdout instead of JSON hookSpecificOutput.additionalContext.
 		// Plugin hooks.json has a known bug (#16538) where additionalContext
 		// is silently discarded. Plain stdout is reliably injected as context.
@@ -300,7 +134,6 @@ if (import.meta.main) {
 
 		try {
 			await postEvent(input.cwd, 'session.compacted', {
-				cortexEntries: cortexEntries.length,
 				repoName,
 			})
 		} catch {

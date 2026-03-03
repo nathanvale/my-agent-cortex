@@ -6,7 +6,7 @@
  *
  * Also provides getMainWorktreeRoot for worktree-aware repo identification --
  * ensuring all worktrees of the same repo share the same identity key
- * (e.g. for cortex files).
+ * (e.g. for session summary files).
  */
 
 export interface FileStatusCounts {

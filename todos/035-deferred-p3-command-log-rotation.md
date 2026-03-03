@@ -1,5 +1,5 @@
 ---
-status: deferred
+status: complete
 priority: p3
 issue_id: "035"
 tags: [code-review, operations]

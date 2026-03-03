@@ -6,7 +6,7 @@ Provides intelligent git context, history exploration, smart commit capabilities
 
 ## Features
 
-- **Worktree-aware cortex keying** - Session memory is shared across all worktrees of the same repo (uses main worktree root instead of `--show-toplevel`)
+- **Worktree-aware repo keying** - Session memory is shared across all worktrees of the same repo (uses main worktree root instead of `--show-toplevel`)
 
 ### Hooks (5 lifecycle events)
 
@@ -26,10 +26,9 @@ Provides intelligent git context, history exploration, smart commit capabilities
 - Appends Bash commands to ~/.claude/logs/git-command-log.jsonl
 - Fire-and-forget audit trail
 
-**PreCompact** - Cortex pattern:
-- Extracts decisions, error fixes, learnings, preferences from transcript
-- Appends to ~/.claude/cortex/{repo-name}.jsonl
-- Saves git state summary (append, not overwrite)
+**PreCompact** - Session summary:
+- Saves git state summary to ~/.claude/session-summaries/{repo-name}.md (append, not overwrite)
+- Outputs git context to stdout so it survives compaction
 
 **Stop** - Auto-commit check:
 - Creates WIP checkpoint for uncommitted tracked changes (feature branches only)

@@ -1,5 +1,5 @@
 {
-	"description": "Git intelligence hooks: context, safety, logging, cortex, auto-commit",
+	"description": "Git intelligence hooks: context, safety, logging, session-summary, auto-commit",
 	"hooks": {
 		"SessionStart": [
 			{

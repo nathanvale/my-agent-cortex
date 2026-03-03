@@ -76,6 +76,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 	let state: LexerState = 'normal'
 	let prevState: LexerState = 'normal' // for escape returns
 	let depth = 0 // nesting depth for $() and ${}
+	const parenReturnStack: LexerState[] = [] // state to return to when $() closes
 	let buf = ''
 	let heredocDelimiter: string | null = null
 	let heredocStrip = false // true for <<- (strip leading tabs)
@@ -192,6 +193,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 					buf += ch
 					i++
 				} else if (ch === '$' && i + 1 < i_max && command[i + 1] === '(') {
+					parenReturnStack.push('normal')
 					state = 'dollar-paren'
 					depth++
 					buf += '$('
@@ -257,6 +259,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 					buf += ch
 					i++
 				} else if (ch === '$' && i + 1 < i_max && command[i + 1] === '(') {
+					parenReturnStack.push('double-quote')
 					state = 'dollar-paren'
 					depth++
 					buf += '$('
@@ -295,7 +298,7 @@ export function tokenizeShell(command: string): TokenizeResult {
 					buf += ch
 					i++
 					if (depth === 0) {
-						state = 'normal'
+						state = parenReturnStack.pop() ?? 'normal'
 					}
 				} else if (ch === "'") {
 					// Single quotes inside $() still work
@@ -329,6 +332,84 @@ export function tokenizeShell(command: string): TokenizeResult {
 					if (i < i_max) {
 						buf += command[i]
 						i++
+					}
+				} else if (
+					ch === '<' &&
+					i + 1 < i_max &&
+					command[i + 1] === '<' &&
+					(i + 2 >= i_max || command[i + 2] !== '<')
+				) {
+					// Heredoc inside $() -- consume the delimiter and body so
+					// the heredoc content does not interfere with depth tracking
+					// or get misinterpreted as flags/arguments.
+					buf += '<<'
+					i += 2
+					// Parse optional `-` for <<-
+					let innerStrip = false
+					if (i < i_max && command[i] === '-') {
+						innerStrip = true
+						buf += '-'
+						i++
+					}
+					// Skip spaces between << and delimiter
+					while (i < i_max && command[i] === ' ') {
+						buf += ' '
+						i++
+					}
+					// Parse delimiter (optionally quoted)
+					let innerDelim = ''
+					if (i < i_max && (command[i] === "'" || command[i] === '"')) {
+						const qc = command[i]!
+						buf += qc
+						i++
+						while (i < i_max && command[i] !== qc) {
+							innerDelim += command[i]
+							buf += command[i]!
+							i++
+						}
+						if (i < i_max) {
+							buf += command[i]!
+							i++
+						}
+					} else if (i < i_max && command[i] === '\\') {
+						buf += command[i]!
+						i++
+						while (i < i_max && /\S/.test(command[i] as string)) {
+							innerDelim += command[i]
+							buf += command[i]!
+							i++
+						}
+					} else {
+						while (i < i_max && /[A-Za-z0-9_]/.test(command[i] as string)) {
+							innerDelim += command[i]
+							buf += command[i]!
+							i++
+						}
+					}
+					if (innerDelim.length > 0) {
+						// Consume heredoc body until closing delimiter line.
+						// Skip leading newline if present.
+						if (i < i_max && command[i] === '\n') {
+							buf += '\n'
+							i++
+						}
+						let foundEnd = false
+						while (i < i_max && !foundEnd) {
+							const lineStart = i
+							while (i < i_max && command[i] !== '\n') i++
+							let line = command.slice(lineStart, i)
+							if (innerStrip) {
+								line = line.replace(/^\t+/, '')
+							}
+							buf += command.slice(lineStart, i)
+							if (line.trim() === innerDelim) {
+								foundEnd = true
+							}
+							if (i < i_max) {
+								buf += '\n'
+								i++
+							}
+						}
 					}
 				} else {
 					buf += ch

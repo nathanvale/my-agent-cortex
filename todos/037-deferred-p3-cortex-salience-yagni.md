@@ -1,5 +1,5 @@
 ---
-status: deferred
+status: complete
 priority: p3
 issue_id: "037"
 tags: [code-review, simplicity]

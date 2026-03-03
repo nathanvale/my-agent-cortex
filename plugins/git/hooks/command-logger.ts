@@ -6,10 +6,13 @@
  * PostToolUse hook that logs Bash commands to an audit trail.
  */
 
-import { appendFile, mkdir } from 'node:fs/promises'
+import { appendFile, mkdir, rename, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { postEvent } from './event-bus-client'
+
+/** Maximum log file size in bytes before rotation (10 MB). */
+const MAX_LOG_SIZE = 10 * 1024 * 1024
 
 interface PostToolUseHookInput {
 	tool_name: string
@@ -56,6 +59,22 @@ export function createLogEntry(
 	}
 }
 
+/**
+ * Rotates the log file if it exceeds MAX_LOG_SIZE. Renames the current file
+ * to `<path>.1`, overwriting any previous backup. Silently ignores missing
+ * files (first write scenario).
+ */
+async function rotateIfNeeded(logPath: string): Promise<void> {
+	try {
+		const info = await stat(logPath)
+		if (info.size >= MAX_LOG_SIZE) {
+			await rename(logPath, `${logPath}.1`)
+		}
+	} catch {
+		// File doesn't exist yet -- nothing to rotate
+	}
+}
+
 if (import.meta.main) {
 	// Self-destruct timer: first executable line when run as entry point.
 	// Set to 80% of hooks.json timeout (5s).
@@ -84,13 +103,15 @@ if (import.meta.main) {
 
 		const logDir = join(homedir(), '.claude', 'logs')
 		const logPath = join(logDir, 'git-command-log.jsonl')
+		const line = `${JSON.stringify(entry)}\n`
 
 		try {
-			await appendFile(logPath, `${JSON.stringify(entry)}\n`)
+			await rotateIfNeeded(logPath)
+			await appendFile(logPath, line)
 		} catch (err: unknown) {
 			if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
 				await mkdir(logDir, { recursive: true })
-				await appendFile(logPath, `${JSON.stringify(entry)}\n`)
+				await appendFile(logPath, line)
 			}
 		}
 

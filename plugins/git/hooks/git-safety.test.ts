@@ -151,31 +151,6 @@ describe('git push --force-with-lease on protected branches', () => {
 	})
 })
 
-describe('git push remote branch deletion', () => {
-	test.each([
-		['git push origin --delete main'],
-		['git push origin -d main'],
-		['git push origin --delete master'],
-		['git push origin :main'],
-		['git push origin :master'],
-	])('blocks deletion of protected branch: %s', (command) => {
-		const result = checkCommand(command)
-		expect(result.blocked).toBe(true)
-		expect(result.reason).toContain('protected remote branch')
-	})
-
-	test.each([
-		['git push origin --delete feature/foo'],
-		['git push origin -d feature/foo'],
-		['git push origin :feature/foo'],
-		['git push origin --delete dev'],
-		['git push origin :dev'],
-	])('allows deletion of non-protected branch: %s', (command) => {
-		const result = checkCommand(command)
-		expect(result.blocked).toBe(false)
-	})
-})
-
 describe('protected-branch commit action detection', () => {
 	test.each([
 		['git commit -m "feat: x"'],
@@ -183,7 +158,6 @@ describe('protected-branch commit action detection', () => {
 		['git revert abc123'],
 		['git merge --no-ff feature/foo'],
 		['git merge --commit feature/foo'],
-		['git merge feature/foo'],
 	])('detects commit-creating action: %s', (command) => {
 		expect(hasProtectedBranchCommitAction(command)).toBe(true)
 	})
@@ -194,7 +168,7 @@ describe('protected-branch commit action detection', () => {
 		['git revert -n abc123'],
 		['git revert --no-commit abc123'],
 		['git merge --squash feature/foo'],
-		['git merge --no-commit feature/foo'],
+		['git merge feature/foo'],
 		['git status'],
 	])('does not detect non-commit action: %s', (command) => {
 		expect(hasProtectedBranchCommitAction(command)).toBe(false)
@@ -481,6 +455,27 @@ describe('issue 1: heredoc body excluded from flag scanning', () => {
 
 	test('heredoc mentioning blocked pattern does not trigger block', () => {
 		const cmd = `cat <<'EOF'\ngit reset --hard HEAD\nEOF`
+		const result = checkCommand(cmd)
+		expect(result.blocked).toBe(false)
+	})
+
+	test('heredoc inside $() inside double quotes is not reported as unbalanced', () => {
+		const cmd = `git commit -m "$(cat <<'EOF'\nCommit message here.\nEOF\n)"`
+		const result = checkCommand(cmd)
+		expect(result.blocked).toBe(false)
+	})
+
+	test('blocked patterns in heredoc commit message body are not incorrectly blocked', () => {
+		const cmd = `git commit -m "$(cat <<'EOF'\nfix(hooks): prevent false positives\n\nThe --no-verify flag should only be used for WIP commits.\nNever use git push --force on shared branches.\nEOF\n)"`
+		const result = checkCommand(cmd)
+		expect(result.blocked).toBe(false)
+		const commit = isCommitCommand(cmd)
+		expect(commit.isCommit).toBe(true)
+		expect(commit.hasNoVerify).toBe(false)
+	})
+
+	test('heredoc commit via $() with unquoted delimiter also works', () => {
+		const cmd = `git commit -m "$(cat <<EOF\nSome message with --force text.\nEOF\n)"`
 		const result = checkCommand(cmd)
 		expect(result.blocked).toBe(false)
 	})

@@ -101,13 +101,12 @@ Review a GitHub pull request with inline comments.
    - Test coverage gaps
    - Naming inconsistencies
    - Security concerns
-7. **Present findings** to user with `file:line` references — ask for approval before posting
-8. **On approval**, create batched pending review: `gh api repos/{owner}/{repo}/pulls/{number}/reviews -X POST` with all comments in a single review
+7. **Present findings** to user with `file:line` references — ask for approval before posting. When `$ARGUMENTS` contains `--submit`, skip the approval gate and post immediately.
+8. **On approval** (or `--submit`), create batched pending review: `gh api repos/{owner}/{repo}/pulls/{number}/reviews -X POST` with all comments in a single review
 9. **Submit review** with appropriate event: `APPROVE`, `REQUEST_CHANGES`, or `COMMENT`
 
 **Key rules:**
-- Draft → Show → Approve → Post (never post without user approval)
-- When `$ARGUMENTS` contains `--submit`, post the review without the interactive approval gate.
+- Draft -> Show -> Approve -> Post (default flow; `--submit` bypasses the approval gate)
 - Batch all comments into one review (no scattered notifications)
 - Include `file:line` references for every finding
 
