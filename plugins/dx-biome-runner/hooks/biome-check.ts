@@ -36,6 +36,11 @@ interface BiomeDiagnostic {
 	severity: 'error' | 'warning'
 }
 
+interface ParsedLineLocation {
+	span?: unknown
+	sourceCode?: string
+}
+
 /** Extract unique file paths from hook input (Write, Edit, MultiEdit). */
 function extractFilePaths(input: HookInput): string[] {
 	const seen = new Set<string>()
@@ -47,6 +52,50 @@ function extractFilePaths(input: HookInput): string[] {
 }
 
 /** Parse Biome JSON reporter output into structured diagnostics. */
+function extractDiagnosticLine(
+	location: ParsedLineLocation | undefined,
+): number {
+	if (!location) return 0
+
+	const { span, sourceCode } = location
+
+	// Legacy/object form compatibility: { start: { line: N } }
+	if (
+		typeof span === 'object' &&
+		span !== null &&
+		'start' in span &&
+		typeof (span as { start?: unknown }).start === 'object' &&
+		(span as { start?: { line?: unknown } }).start !== null
+	) {
+		const line = (span as { start?: { line?: unknown } }).start?.line
+		if (typeof line === 'number' && Number.isFinite(line)) return line
+	}
+
+	// Biome JSON form: span is [startOffset, endOffset] (or a numeric start).
+	let startOffset: number | null = null
+	if (
+		Array.isArray(span) &&
+		span.length > 0 &&
+		typeof span[0] === 'number' &&
+		Number.isFinite(span[0])
+	) {
+		startOffset = span[0]
+	} else if (typeof span === 'number' && Number.isFinite(span)) {
+		startOffset = span
+	}
+
+	if (startOffset !== null && typeof sourceCode === 'string') {
+		const safeOffset = Math.max(0, Math.min(startOffset, sourceCode.length))
+		let line = 1
+		for (let i = 0; i < safeOffset; i += 1) {
+			if (sourceCode.charCodeAt(i) === 10) line += 1 // '\n'
+		}
+		return line
+	}
+
+	return 0
+}
+
 function parseBiomeOutput(stdout: string): BiomeDiagnostic[] {
 	const diagnostics: BiomeDiagnostic[] = []
 	try {
@@ -56,7 +105,7 @@ function parseBiomeOutput(stdout: string): BiomeDiagnostic[] {
 				if (d.severity === 'error' || d.severity === 'warning') {
 					diagnostics.push({
 						file: d.location?.path?.file || 'unknown',
-						line: d.location?.span?.start?.line || 0,
+						line: extractDiagnosticLine(d.location),
 						message: d.description || d.message || 'Unknown issue',
 						code: d.category || 'unknown',
 						severity: d.severity,

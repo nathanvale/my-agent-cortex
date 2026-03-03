@@ -9,7 +9,7 @@
  * Exit 0 = clean, Exit 2 = errors (blocking).
  */
 
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 
 const BIOME_EXTENSIONS = [
 	'.ts',
@@ -27,6 +27,11 @@ interface BiomeDiagnostic {
 	message: string
 	code: string
 	severity: 'error' | 'warning'
+}
+
+interface ParsedLineLocation {
+	span?: unknown
+	sourceCode?: string
 }
 
 async function getGitRoot(): Promise<string | null> {
@@ -67,19 +72,51 @@ async function hasChangedBiomeFiles(): Promise<boolean> {
 	)
 }
 
-/** Check if root is a Bun/npm workspace (array-form only). */
-function isWorkspace(root: string): boolean {
-	try {
-		const pkg = JSON.parse(readFileSync(`${root}/package.json`, 'utf-8')) as {
-			workspaces?: unknown
-		}
-		return Array.isArray(pkg.workspaces) && pkg.workspaces.length > 0
-	} catch {
-		return false
+/** Parse Biome JSON reporter output into structured diagnostics. */
+function extractDiagnosticLine(
+	location: ParsedLineLocation | undefined,
+): number {
+	if (!location) return 0
+
+	const { span, sourceCode } = location
+
+	// Legacy/object form compatibility: { start: { line: N } }
+	if (
+		typeof span === 'object' &&
+		span !== null &&
+		'start' in span &&
+		typeof (span as { start?: unknown }).start === 'object' &&
+		(span as { start?: { line?: unknown } }).start !== null
+	) {
+		const line = (span as { start?: { line?: unknown } }).start?.line
+		if (typeof line === 'number' && Number.isFinite(line)) return line
 	}
+
+	// Biome JSON form: span is [startOffset, endOffset] (or a numeric start).
+	let startOffset: number | null = null
+	if (
+		Array.isArray(span) &&
+		span.length > 0 &&
+		typeof span[0] === 'number' &&
+		Number.isFinite(span[0])
+	) {
+		startOffset = span[0]
+	} else if (typeof span === 'number' && Number.isFinite(span)) {
+		startOffset = span
+	}
+
+	if (startOffset !== null && typeof sourceCode === 'string') {
+		const safeOffset = Math.max(0, Math.min(startOffset, sourceCode.length))
+		let line = 1
+		for (let i = 0; i < safeOffset; i += 1) {
+			if (sourceCode.charCodeAt(i) === 10) line += 1 // '\n'
+		}
+		return line
+	}
+
+	return 0
 }
 
-/** Parse Biome JSON reporter output into structured diagnostics. */
 function parseBiomeOutput(stdout: string): BiomeDiagnostic[] {
 	const diagnostics: BiomeDiagnostic[] = []
 	try {
@@ -89,7 +126,7 @@ function parseBiomeOutput(stdout: string): BiomeDiagnostic[] {
 				if (d.severity === 'error' || d.severity === 'warning') {
 					diagnostics.push({
 						file: d.location?.path?.file || 'unknown',
-						line: d.location?.span?.start?.line || 0,
+						line: extractDiagnosticLine(d.location),
 						message: d.description || d.message || 'Unknown issue',
 						code: d.category || 'unknown',
 						severity: d.severity,
@@ -128,12 +165,8 @@ async function main() {
 	if (!existsSync(`${root}/biome.json`) && !existsSync(`${root}/biome.jsonc`))
 		process.exit(0)
 
-	// For workspaces, use bun run check which is configured in package.json
-	// For single packages, run biome check directly with JSON reporter
-	const useWorkspaceScript = isWorkspace(root)
-	const cmd = useWorkspaceScript
-		? ['bun', 'run', '--filter', '*', 'check']
-		: ['bunx', '@biomejs/biome', 'check', '--reporter=json', root]
+	// Always run Biome directly to avoid executing unrelated workspace scripts.
+	const cmd = ['bunx', '@biomejs/biome', 'check', '--reporter=json', root]
 
 	const proc = Bun.spawn(cmd, {
 		cwd: root,
@@ -149,29 +182,6 @@ async function main() {
 	])
 
 	if (exitCode === 0) process.exit(0)
-
-	// For workspace script mode, output is not JSON -- report raw
-	if (useWorkspaceScript) {
-		const combinedOutput = `${stdout}${stderr}`.trim()
-		if (combinedOutput) {
-			process.stderr.write(
-				JSON.stringify({
-					tool: 'biome-ci',
-					status: 'error',
-					errorCount: 1,
-					errors: [
-						{
-							file: 'project',
-							line: 0,
-							message: combinedOutput.slice(0, 2000),
-						},
-					],
-				}),
-			)
-			process.exit(2)
-		}
-		process.exit(0)
-	}
 
 	// Parse stdout first (biome --reporter=json writes JSON to stdout).
 	// Fall back to stderr only if stdout yields nothing -- avoids corrupting
