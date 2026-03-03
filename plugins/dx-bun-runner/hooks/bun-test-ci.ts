@@ -48,6 +48,32 @@ async function hasChangedTsFiles(): Promise<boolean> {
 	)
 }
 
+/** Check if any test files exist in the repo. */
+async function hasTestFiles(root: string): Promise<boolean> {
+	const proc = Bun.spawn(
+		['git', 'ls-files', '--cached', '--others', '--exclude-standard'],
+		{ cwd: root, stdout: 'pipe', stderr: 'pipe' },
+	)
+	const [output, exitCode] = await Promise.all([
+		proc.stdout.text(),
+		proc.exited,
+	])
+	if (exitCode !== 0) {
+		const stderr = await proc.stderr.text()
+		process.stderr.write(
+			`bun-test-ci: git ls-files failed (exit ${exitCode}): ${stderr.trim()}\n`,
+		)
+		return true // Conservatively assume tests exist
+	}
+	// Match Bun's test discovery: .test.ext, .spec.ext, _test.ext, _spec.ext
+	return output
+		.trim()
+		.split('\n')
+		.some(
+			(file) => file && /[._](test|spec)\.(ts|tsx|js|jsx|mts|cts)$/.test(file),
+		)
+}
+
 async function main() {
 	// Check stop_hook_active to prevent infinite loops
 	let stopHookActive = false
@@ -71,6 +97,9 @@ async function main() {
 
 	// Need a package.json to run bun test
 	if (!existsSync(`${root}/package.json`)) process.exit(0)
+
+	// Skip if no test files exist (avoids "No tests found!" error)
+	if (!(await hasTestFiles(root))) process.exit(0)
 
 	const proc = Bun.spawn(['bun', 'test'], {
 		cwd: root,

@@ -8,6 +8,7 @@
  * Uses stdout JSON with `decision: "block"` for structured error feedback.
  */
 
+import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const BIOME_EXTENSIONS = [
@@ -119,6 +120,20 @@ function parseBiomeOutput(stdout: string): BiomeDiagnostic[] {
 	return diagnostics
 }
 
+async function getGitRoot(): Promise<string | null> {
+	const proc = Bun.spawn(['git', 'rev-parse', '--show-toplevel'], {
+		stdout: 'pipe',
+		stderr: 'pipe',
+	})
+	const [exitCode, stdout] = await Promise.all([
+		proc.exited,
+		proc.stdout.text(),
+		proc.stderr.text(),
+	])
+	if (exitCode !== 0) return null
+	return stdout.trim() || null
+}
+
 async function main() {
 	const input = await Bun.stdin.text()
 	let hookInput: HookInput
@@ -133,6 +148,15 @@ async function main() {
 	)
 
 	if (filePaths.length === 0) process.exit(0)
+
+	// Skip if no Biome config exists (avoids false positives in Prettier/ESLint repos)
+	const gitRoot = await getGitRoot()
+	if (!gitRoot) process.exit(0)
+	if (
+		!existsSync(`${gitRoot}/biome.json`) &&
+		!existsSync(`${gitRoot}/biome.jsonc`)
+	)
+		process.exit(0)
 
 	// Resolve to absolute paths for biome
 	const absolutePaths = filePaths.map((f) => resolve(f))
