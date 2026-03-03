@@ -20,8 +20,13 @@ import { getCurrentBranch, runGit } from './git-utils'
  */
 const NOISE_PATTERNS = [
 	/\.DS_Store$/,
-	/(^|\/)node_modules\//,
-	/(^|\/)\.(env|env\..*)$/,
+	/(^|[\\/])node_modules[\\/]/,
+	/(^|[\\/])\.(env|env\..*)$/,
+	/(^|[\\/])\.npmrc$/,
+	/(^|[\\/])id_(rsa|dsa|ecdsa|ed25519)(\.pub)?$/,
+	/\.(pem|key|p12|pfx)$/i,
+	/(^|[\\/])\.aws[\\/]credentials$/,
+	/(^|[\\/])\.ssh[\\/]/,
 ]
 
 interface StopHookInput {

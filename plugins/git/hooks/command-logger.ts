@@ -35,6 +35,26 @@ export interface CommandLogEntry {
 	command: string
 }
 
+function redactCommand(command: string): string {
+	let redacted = command
+	// Common flag patterns: --token value, --password=value, etc.
+	redacted = redacted.replace(
+		/(--?(?:token|password|passwd|secret|api[-_]?key|auth(?:orization)?))(=|\s+)([^\s]+)/gi,
+		(_, key: string, sep: string) => `${key}${sep}[REDACTED]`,
+	)
+	// Bearer tokens
+	redacted = redacted.replace(
+		/\b(Bearer)\s+[A-Za-z0-9._~+/=-]+\b/gi,
+		'$1 [REDACTED]',
+	)
+	// Basic auth in URLs
+	redacted = redacted.replace(
+		/\bhttps?:\/\/([^/\s:@]+):([^@\s/]+)@/gi,
+		'https://$1:[REDACTED]@',
+	)
+	return redacted
+}
+
 /**
  * Builds a structured log entry from a PostToolUse hook payload. Returns null
  * for non-Bash tools so only shell commands are recorded in the audit trail.
@@ -55,7 +75,7 @@ export function createLogEntry(
 		timestamp: new Date().toISOString(),
 		session_id: input.session_id || 'unknown',
 		cwd: input.cwd || 'unknown',
-		command,
+		command: redactCommand(command),
 	}
 }
 

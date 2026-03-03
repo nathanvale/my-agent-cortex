@@ -19,6 +19,17 @@ interface PreCompactHookInput {
 	transcript_path?: string
 }
 
+function sanitizeContextLine(value: string): string {
+	// Strip ASCII control characters (0x00-0x1F and 0x7F) using charCodeAt to
+	// avoid Biome noControlCharactersInRegex lint rule on regex literals.
+	let out = ''
+	for (let i = 0; i < value.length; i++) {
+		const c = value.charCodeAt(i)
+		out += c <= 0x1f || c === 0x7f ? ' ' : value[i]
+	}
+	return out.replace(/```/g, "'''").replace(/\s+/g, ' ').trim()
+}
+
 function isPreCompactHookInput(value: unknown): value is PreCompactHookInput {
 	if (!value || typeof value !== 'object') return false
 	if (!('cwd' in value) || typeof value.cwd !== 'string') return false
@@ -43,14 +54,14 @@ async function getGitStateSummary(cwd: string): Promise<string> {
 
 	const branch =
 		branchResult.exitCode === 0
-			? branchResult.stdout || '(detached)'
+			? sanitizeContextLine(branchResult.stdout || '(detached)')
 			: '(detached)'
 
 	const commits =
 		commitsResult.exitCode === 0
 			? commitsResult.stdout
 					.split('\n')
-					.map((line) => line.trim())
+					.map((line) => sanitizeContextLine(line))
 					.filter(Boolean)
 					.slice(0, 10)
 			: []
@@ -59,7 +70,7 @@ async function getGitStateSummary(cwd: string): Promise<string> {
 		statusResult.exitCode === 0
 			? statusResult.stdout
 					.split('\n')
-					.map((line) => line.trimEnd())
+					.map((line) => sanitizeContextLine(line))
 					.filter(Boolean)
 					.slice(0, 20)
 			: []

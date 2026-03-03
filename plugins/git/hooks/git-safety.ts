@@ -97,6 +97,32 @@ function hasLongFlagPrefix(args: string[], prefix: string): boolean {
 	return args.some((arg) => arg.startsWith(prefix))
 }
 
+function getInlineExecScript(
+	normalizedHead: string | null,
+	args: string[],
+): string | null {
+	if (!normalizedHead) return null
+	const flagMap: Record<string, string[]> = {
+		python: ['-c'],
+		python3: ['-c'],
+		node: ['-e', '--eval'],
+		ruby: ['-e'],
+		perl: ['-e'],
+		php: ['-r'],
+		lua: ['-e'],
+	}
+	const flags = flagMap[normalizedHead]
+	if (!flags) return null
+	for (let i = 0; i < args.length; i++) {
+		const arg = args[i] || ''
+		if (flags.includes(arg)) return args[i + 1] || ''
+		for (const flag of flags) {
+			if (arg.startsWith(`${flag}=`)) return arg.slice(flag.length + 1)
+		}
+	}
+	return null
+}
+
 function extractCommitMessages(args: string[]): string[] {
 	const messages: string[] = []
 	for (let i = 0; i < args.length; i++) {
@@ -528,6 +554,17 @@ function checkParsedSegments(
 
 		const { words, cmdIndex, head } = getCommandWords(segment)
 		const normalizedHead = normalizeExecutableName(head)
+		if (cmdIndex >= 0) {
+			const args = words.slice(cmdIndex + 1)
+			const inlineScript = getInlineExecScript(normalizedHead, args)
+			if (inlineScript !== null) {
+				return {
+					blocked: true,
+					reason:
+						'Inline interpreter execution (-c/-e/-r/--eval) cannot be safety-analyzed reliably. Use direct commands instead.',
+				}
+			}
+		}
 		if (normalizedHead === 'xargs' && cmdIndex >= 0) {
 			const args = words.slice(cmdIndex + 1)
 			const hasReplaceTemplate = args.some(

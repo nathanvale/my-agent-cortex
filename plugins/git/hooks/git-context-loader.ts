@@ -56,6 +56,17 @@ interface GitContext {
 	recentCommits: string[]
 }
 
+function sanitizeContextLine(value: string): string {
+	// Strip ASCII control characters (0x00-0x1F and 0x7F) using charCodeAt to
+	// avoid Biome noControlCharactersInRegex lint rule on regex literals.
+	let out = ''
+	for (let i = 0; i < value.length; i++) {
+		const c = value.charCodeAt(i)
+		out += c <= 0x1f || c === 0x7f ? ' ' : value[i]
+	}
+	return out.replace(/```/g, "'''").replace(/\s+/g, ' ').trim()
+}
+
 /** Gathers git state. Uses fewer commits on compact/clear to save context budget. */
 export async function getGitContext(
 	cwd: string,
@@ -104,14 +115,15 @@ export function formatAdditionalContext(
 	// Section 1: Repository state
 	const restoredNote =
 		source === 'compact' ? ' (restored after compaction)' : ''
+	const safeBranch = sanitizeContextLine(branch)
 	let state = `## Git Repository Context${restoredNote}\n\n`
-	state += `Branch: ${branch}\n`
+	state += `Branch: ${safeBranch}\n`
 	state += `Status: ${status.modified} modified, ${status.untracked} untracked, ${status.staged} staged\n`
 
 	if (recentCommits.length > 0) {
 		state += `\nRecent commits:\n`
 		for (const commit of recentCommits) {
-			state += `- ${commit}\n`
+			state += `- ${sanitizeContextLine(commit)}\n`
 		}
 	} else {
 		state += '\nNo commits yet.\n'
