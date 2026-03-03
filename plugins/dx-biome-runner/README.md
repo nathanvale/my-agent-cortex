@@ -16,7 +16,7 @@ Biome linter and formatter with post-edit hooks and an MCP server for on-demand 
 
 The MCP tools are provided by the `@side-quest/biome-runner` npm package. Use `response_format: "json"` for structured output:
 
-```
+```typescript
 biome_lintCheck({ response_format: "json" })
 biome_lintFix({ response_format: "json" })
 biome_formatCheck({ response_format: "json" })
@@ -34,8 +34,7 @@ biome_formatCheck({ response_format: "json" })
 
 **Stop (biome-ci.ts)**
 - Fires at session end
-- Runs full project-wide Biome check (all errors, not just edited files)
-- Detects Bun workspaces and runs `bun run --filter * check` if present
+- Runs `biome check --reporter=json` on the project root (all errors, not just edited files)
 - Skips if no Biome-relevant files were changed
 - Checks `stop_hook_active` to prevent infinite loops
 - 120s timeout, exits cleanly on timeout (non-blocking)

@@ -2,7 +2,7 @@
 description: View biome-runner MCP server and hook logs
 model: haiku
 allowed-tools: Read
-argument-hint: "[count=N] [level=LEVEL] [errors]"
+argument-hint: "[count=N] [level=LEVEL] [errors] [cid=ID]"
 ---
 
 Read the log file at `~/.claude/logs/biome-runner.jsonl` and display recent entries. $ARGUMENTS
