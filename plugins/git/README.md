@@ -35,6 +35,20 @@ Recommended rollout:
 - Use `commit-guard` during temporary migration/debugging windows.
 - Use `advisory` only for diagnostics with explicit team consent.
 
+### Pre-Merge Validation
+
+Run these checks before merging safety changes to `main`:
+
+1. `bun test plugins/git/hooks/`
+2. `bun run typecheck`
+3. Runtime mode smoke checks:
+  - `strict`: destructive command should deny
+  - `commit-guard`: destructive command should warn/allow, commit policy should still deny
+  - `advisory`: no deny decisions, warnings/events only
+
+Operational default:
+- Keep `CLAUDE_GIT_SAFETY_MODE` unset in production (`strict` by default).
+
 **PostToolUse** - Command logger:
 - Appends Bash commands to ~/.claude/logs/git-command-log.jsonl
 - Fire-and-forget audit trail
