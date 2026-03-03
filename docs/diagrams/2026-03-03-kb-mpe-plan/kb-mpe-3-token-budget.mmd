@@ -11,7 +11,7 @@ flowchart LR
     TOTAL["Typical session<br/>~5-8K tokens"]:::success
     WORST["All references<br/>~20K tokens"]:::highlight
 
-    DESC -->|"every session"| SKILL
+    DESC -->|"MPE detected"| SKILL
     SKILL -->|"MPE detected"| REFS
     REFS -->|"per query"| TOTAL
     REFS -.->|"never expected"| WORST

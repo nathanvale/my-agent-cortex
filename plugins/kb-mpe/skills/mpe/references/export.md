@@ -224,7 +224,7 @@ MathJax/KaTeX formulas won't render in CDN-exported HTML if served from `file://
 
 ### Large File Performance
 
-Exporting large files (500+ lines with many diagrams) can be slow or timeout. Increase `puppeteerWaitForTimeout` or `puppeteer.timeout` for Puppeteer exports.
+Exporting large files (500+ lines with many diagrams) can be slow or time out. Increase `puppeteerWaitForTimeout` or `puppeteer.timeout` for Puppeteer exports.
 
 ### Diagram Export Limitations
 
