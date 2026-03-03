@@ -906,6 +906,7 @@ if (import.meta.main) {
 		const input: PreToolUseHookInput = raw
 
 		const toolInput = input.tool_input
+		const safetyMode = getGitSafetyMode()
 
 		if (input.tool_name === 'Write' || input.tool_name === 'Edit') {
 			const filePath = toolInput?.file_path
@@ -915,7 +916,19 @@ if (import.meta.main) {
 
 			const fileResult = checkFileEdit(filePath)
 			if (fileResult.blocked) {
-				await denyAndExit(fileResult.reason ?? 'Protected file.', input)
+				if (safetyMode === 'strict') {
+					await denyAndExit(fileResult.reason ?? 'Protected file.', input)
+				}
+				try {
+					await postEvent(input.cwd || process.cwd(), 'safety.warn', {
+						tool: input.tool_name,
+						mode: safetyMode,
+						reason: fileResult.reason ?? 'Protected file.',
+						filePath,
+					})
+				} catch {
+					// event emission is best-effort
+				}
 			}
 
 			process.exit(0)
@@ -929,7 +942,6 @@ if (import.meta.main) {
 		if (typeof command !== 'string') {
 			process.exit(0)
 		}
-		const safetyMode = getGitSafetyMode()
 
 		const commandResult = checkCommand(command)
 		if (commandResult.blocked) {

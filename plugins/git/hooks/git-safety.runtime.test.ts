@@ -47,16 +47,26 @@ function createTempRepo(): { cwd: string; branch: string } {
 }
 
 function runSafetyHook(params: {
-	command: string
+	command?: string
+	filePath?: string
+	toolName?: 'Bash' | 'Write' | 'Edit'
 	cwd: string
 	mode: 'strict' | 'commit-guard' | 'advisory'
 	protectedBranches?: string
 }): HookRunResult {
-	const payload = JSON.stringify({
-		tool_name: 'Bash',
-		tool_input: { command: params.command },
-		cwd: params.cwd,
-	})
+	const payload = JSON.stringify(
+		params.toolName === 'Write' || params.toolName === 'Edit'
+			? {
+					tool_name: params.toolName,
+					tool_input: { file_path: params.filePath ?? '.env' },
+					cwd: params.cwd,
+				}
+			: {
+					tool_name: params.toolName ?? 'Bash',
+					tool_input: { command: params.command ?? '' },
+					cwd: params.cwd,
+				},
+	)
 	const scriptPath = join(import.meta.dir, 'git-safety.ts')
 	const proc = Bun.spawnSync([process.execPath, scriptPath], {
 		env: {
@@ -126,6 +136,42 @@ describe('git-safety runtime mode behavior', () => {
 			cwd,
 			mode: 'advisory',
 			protectedBranches: branch,
+		})
+		expect(result.exitCode).toBe(0)
+		expect(result.stdout).not.toContain('"permissionDecision":"deny"')
+	})
+
+	test('strict denies protected file edits', () => {
+		const { cwd } = createTempRepo()
+		const result = runSafetyHook({
+			cwd,
+			mode: 'strict',
+			toolName: 'Write',
+			filePath: '.env',
+		})
+		expect(result.exitCode).toBe(2)
+		expect(result.stdout).toContain('"permissionDecision":"deny"')
+	})
+
+	test('commit-guard does not deny protected file edits', () => {
+		const { cwd } = createTempRepo()
+		const result = runSafetyHook({
+			cwd,
+			mode: 'commit-guard',
+			toolName: 'Write',
+			filePath: '.env',
+		})
+		expect(result.exitCode).toBe(0)
+		expect(result.stdout).not.toContain('"permissionDecision":"deny"')
+	})
+
+	test('advisory does not deny protected file edits', () => {
+		const { cwd } = createTempRepo()
+		const result = runSafetyHook({
+			cwd,
+			mode: 'advisory',
+			toolName: 'Edit',
+			filePath: '.env.local',
 		})
 		expect(result.exitCode).toBe(0)
 		expect(result.stdout).not.toContain('"permissionDecision":"deny"')
