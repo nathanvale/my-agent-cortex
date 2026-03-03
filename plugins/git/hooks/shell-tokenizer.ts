@@ -1116,6 +1116,8 @@ export function extractWrappedShellCommand(segment: string): string | null {
 		normalizedHead === 'sh' ||
 		normalizedHead === 'bash' ||
 		normalizedHead === 'zsh' ||
+		normalizedHead === 'dash' ||
+		normalizedHead === 'ksh' ||
 		normalizedHead === 'fish' ||
 		normalizedHead === 'pwsh' ||
 		normalizedHead === 'powershell'

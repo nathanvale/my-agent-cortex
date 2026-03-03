@@ -7,7 +7,7 @@
  * so the agent retains repo context after compaction.
  */
 
-import { mkdir } from 'node:fs/promises'
+import { appendFile, mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { getRepoKeyFromGitRoot, postEvent } from './event-bus-client'
@@ -125,12 +125,9 @@ if (import.meta.main) {
 		const summaryDir = join(homedir(), '.claude', 'session-summaries')
 		await ensureDirectory(summaryDir)
 		const summaryPath = join(summaryDir, `${repoName}.md`)
-		const existingSummary = (await Bun.file(summaryPath).exists())
-			? await Bun.file(summaryPath).text()
-			: ''
 		const timestamp = new Date().toISOString()
 		const newEntry = `\n---\n## Compaction ${timestamp}\n\n${gitState}\n`
-		await Bun.write(summaryPath, existingSummary + newEntry)
+		await appendFile(summaryPath, newEntry, 'utf8')
 
 		const contextParts: string[] = [
 			`Git state at compaction:\n${gitState}`,

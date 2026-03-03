@@ -737,6 +737,8 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 	test.each([
 		['sh -c "git reset --hard"'],
 		['bash -lc "git clean -fd"'],
+		['dash -c "git push --force origin main"'],
+		['ksh -c "git reset --hard"'],
 		['env git reset --hard'],
 		['command git reset --hard'],
 		['time git clean -fd'],

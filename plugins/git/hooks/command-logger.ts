@@ -49,8 +49,8 @@ function redactCommand(command: string): string {
 	)
 	// Basic auth in URLs
 	redacted = redacted.replace(
-		/\bhttps?:\/\/([^/\s:@]+):([^@\s/]+)@/gi,
-		'https://$1:[REDACTED]@',
+		/\b(https?):\/\/([^/\s:@]+):([^@\s/]+)@/gi,
+		'$1://$2:[REDACTED]@',
 	)
 	return redacted
 }
