@@ -186,7 +186,7 @@ user-invocable: false
 
 ### 1.1 Create directory structure
 
-```
+```text
 plugins/kb-mpe/
   .claude-plugin/
     plugin.json

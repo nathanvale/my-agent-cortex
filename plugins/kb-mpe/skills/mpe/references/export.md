@@ -193,7 +193,8 @@ Trigger any export automatically when the file is saved:
 ---
 export_on_save:
   puppeteer: true                # PDF only
-  puppeteer: ["pdf", "png"]      # Multiple formats
+  # or:
+  # puppeteer: ["pdf", "png"]    # Multiple formats
   html: true                     # HTML export
   pandoc: true                   # Pandoc export
   markdown: true                 # GFM Markdown export

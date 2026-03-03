@@ -129,7 +129,7 @@ Available events: `SessionStart`, `PreToolUse`, `PostToolUse`, `PostToolUseFailu
 - **Formatting:** Biome -- tabs, single quotes, 80-char line width
 - **Single biome.json at root** -- NEVER create nested configs
 - **Commits:** Conventional Commits (`feat(scope): subject`)
-- **Plugin names:** `kb-` prefix for knowledge bank plugins, no prefix for core plugins
+- **Plugin names:** core plugins use no prefix; knowledge bank use `kb-*`; developer experience use `dx-*`; integration use `int-*`
 - **Branches:** `type/description` (e.g., `feat/add-cortex`)
 - **Hook TypeScript:** always include a self-destruct timer as the first executable line for safety
 
