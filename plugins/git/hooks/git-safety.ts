@@ -141,6 +141,13 @@ function isProtectedBranchRef(ref: string): boolean {
 	return PROTECTED_BRANCHES.includes(normalized)
 }
 
+function isProtectedBranchLike(ref: string): boolean {
+	const normalized = normalizeBranchRef(ref)
+	if (PROTECTED_BRANCHES.includes(normalized)) return true
+	const maybeRemoteQualified = normalized.split('/').pop() ?? ''
+	return PROTECTED_BRANCHES.includes(maybeRemoteQualified)
+}
+
 function getPushRefspecArgs(args: string[]): string[] {
 	const nonFlagArgs = args.filter((a) => !a.startsWith('-'))
 	if (nonFlagArgs.length <= 0) return []
@@ -254,6 +261,11 @@ function checkParsedSegments(
 					args.some((a) => a.startsWith('--force-with-lease='))
 				const hasForceIfIncludes = hasLongFlag(args, '--force-if-includes')
 				const refspecArgs = getPushRefspecArgs(args)
+				const hasProtectedLeaseTarget = args
+					.filter((arg) => arg.startsWith('--force-with-lease='))
+					.map((arg) => arg.slice('--force-with-lease='.length))
+					.map((value) => value.split(':')[0] ?? '')
+					.some((target) => isProtectedBranchLike(target))
 				if (hasMirror) {
 					return {
 						blocked: true,
@@ -282,7 +294,7 @@ function checkParsedSegments(
 							: arg
 						return isProtectedBranchRef(target)
 					})
-					if (targetsProtected) {
+					if (targetsProtected || hasProtectedLeaseTarget) {
 						return {
 							blocked: true,
 							reason:
@@ -516,6 +528,21 @@ function checkParsedSegments(
 
 		const { words, cmdIndex, head } = getCommandWords(segment)
 		const normalizedHead = normalizeExecutableName(head)
+		if (
+			cmdIndex >= 0 &&
+			['sh', 'bash', 'zsh', 'dash', 'ksh'].includes(normalizedHead ?? '')
+		) {
+			const args = words.slice(cmdIndex + 1)
+			const readsCommandsFromStdin =
+				args.length === 0 || args.includes('-s') || args.includes('--stdin')
+			if (readsCommandsFromStdin) {
+				return {
+					blocked: true,
+					reason:
+						'Shell commands reading script input from stdin cannot be safety-analyzed. Avoid piping commands into sh/bash.',
+				}
+			}
+		}
 		if (normalizedHead === 'find' && cmdIndex >= 0) {
 			const args = words.slice(cmdIndex + 1)
 			if (args.includes('-delete')) {

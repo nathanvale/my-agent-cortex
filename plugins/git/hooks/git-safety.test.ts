@@ -118,6 +118,8 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-with-lease origin master'],
 		['git push --force-if-includes origin main'],
 		['git push --force-with-lease=origin/main origin main'],
+		['git push --force-with-lease=refs/heads/main'],
+		['git push --force-with-lease=main'],
 		['git push --force-with-lease origin HEAD:refs/heads/main'],
 		['git push --force-if-includes origin HEAD:refs/heads/master'],
 		['git push --force-with-lease HEAD:refs/heads/main'],
@@ -132,6 +134,7 @@ describe('git push --force-with-lease on protected branches', () => {
 		['git push --force-with-lease origin feat/my-feature'],
 		['git push --force-with-lease origin dev'],
 		['git push --force-if-includes origin feat/auth'],
+		['git push --force-with-lease=origin/feat/my-feature'],
 	])('allows on feature branch: %s', (command) => {
 		const result = checkCommand(command)
 		expect(result.blocked).toBe(false)
@@ -721,6 +724,8 @@ describe('issue 5: shell indirection does not bypass safety checks', () => {
 		['bash -lc "git clean -fd"'],
 		['env git reset --hard'],
 		['eval "git push --force origin main"'],
+		['printf "%s\\n" "git push --delete=main" | sh'],
+		['printf "%s\\n" "git push --delete=main" | bash -s'],
 		['printf "%s\\n" "foo" | xargs git reset --hard'],
 		['echo "$(git reset --hard)"'],
 		['echo `git clean -fd`'],
