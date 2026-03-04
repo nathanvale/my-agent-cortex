@@ -588,14 +588,14 @@ $ARGUMENTS
 ### Why This Works
 
 - **Skill as background knowledge**: Claude auto-discovers and loads it when the user's request matches the description. No slash command needed.
-- **Command as explicit action**: Users who want to trigger the workflow intentionally use `/do-x`. The `disable-model-invocation: true` prevents Claude from triggering it autonomously.
+- **Command as zero-cost entry point**: The command uses `disable-model-invocation: true` so it costs zero context budget. Users invoke it by typing `/do-x`. The skill handles auto-discovery and pays the context cost.
 - **No duplication**: The command delegates to the skill. One source of truth.
 
 ### When to Use
 
-- Skill contains domain knowledge that should auto-load when relevant
-- Users also want an explicit `/` command to trigger workflows
-- The workflows have side effects (creating files, modifying code)
+- Skill contains domain knowledge that should auto-load when relevant (pays context budget)
+- Users also want an explicit `/` command to trigger workflows (zero context cost)
+- You want a clean separation between auto-discovered knowledge and deliberate actions
 
 ## Arguments Pass-through Pattern
 

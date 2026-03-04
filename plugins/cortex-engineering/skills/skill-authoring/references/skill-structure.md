@@ -93,8 +93,8 @@ description: Helps with documents
 | Field | Description |
 |-------|-------------|
 | `argument-hint` | Usage hints. Example: `[issue-number]` |
-| `disable-model-invocation` | `true` to prevent auto-loading. Use for side-effect workflows. |
-| `user-invocable` | `false` to hide from `/` menu. Use for background knowledge. |
+| `disable-model-invocation` | `true` to make a pure slash command (zero context cost, invisible to Claude). Use for workflows you invoke by typing `/name`. |
+| `user-invocable` | `false` to hide from `/` menu. Only use for knowledge bank skills. |
 | `allowed-tools` | Tools without permission prompts. Example: `Read, Bash(git *)` |
 | `model` | `haiku`, `sonnet`, or `opus` |
 | `context` | `fork` for isolated subagent execution |
@@ -136,7 +136,7 @@ Before finalizing:
 - [ ] YAML frontmatter valid (name matches directory, description specific)
 - [ ] Uses standard markdown headings (not XML tags)
 - [ ] Has Quick Start, Instructions, and Success Criteria sections
-- [ ] `disable-model-invocation: true` if skill has side effects
+- [ ] Leave invocation defaults unless knowledge bank (`user-invocable: false`) or truly irreversible (`disable-model-invocation: true`)
 - [ ] SKILL.md under 500 lines
 - [ ] Reference files linked properly from SKILL.md
 - [ ] File paths use forward slashes
@@ -147,6 +147,6 @@ Before finalizing:
 - **XML tags in body** - Use standard markdown headings
 - **Vague descriptions** - Be specific with trigger keywords
 - **Deep nesting** - Keep references one level from SKILL.md
-- **Missing invocation control** - Side-effect workflows need `disable-model-invocation: true`
+- **Wasting context budget** - Only skills Claude should auto-discover belong in the 2% budget; use `disable-model-invocation: true` for everything else
 - **Inconsistent naming** - Directory name must match `name` field
 - **Windows paths** - Always use forward slashes

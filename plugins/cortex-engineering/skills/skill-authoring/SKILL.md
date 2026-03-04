@@ -59,8 +59,8 @@ All fields are optional. Only `description` is recommended.
 | `name` | No | Display name. Lowercase letters, numbers, hyphens (max 64 chars). Defaults to directory name. |
 | `description` | Recommended | What it does AND when to use it. Claude uses this for auto-discovery. Max 1024 chars. |
 | `argument-hint` | No | Hint shown during autocomplete. Example: `[issue-number]` |
-| `disable-model-invocation` | No | Set `true` to prevent Claude auto-loading. Use for manual workflows like `/deploy`, `/commit`. Default: `false`. |
-| `user-invocable` | No | Set `false` to hide from `/` menu. Use for background knowledge. Default: `true`. |
+| `disable-model-invocation` | No | Set `true` to make a pure slash command (zero context cost, invisible to Claude). Default: `false`. |
+| `user-invocable` | No | Set `false` to hide from `/` menu. Only use for knowledge bank skills. Default: `true`. |
 | `allowed-tools` | No | Tools Claude can use without permission prompts. Example: `Read, Bash(git *)` |
 | `model` | No | Model to use. Options: `haiku`, `sonnet`, `opus`. |
 | `context` | No | Set `fork` to run in isolated subagent context. |
@@ -74,9 +74,15 @@ All fields are optional. Only `description` is recommended.
 | `disable-model-invocation: true` | Yes | No | Description not in context, loads only when user invokes |
 | `user-invocable: false` | No | Yes | Description always in context, loads when relevant |
 
-**Use `disable-model-invocation: true`** for workflows with side effects: `/deploy`, `/commit`, `/triage-prs`, `/send-slack-message`. You don't want Claude deciding to deploy because your code looks ready.
+The key insight: **`disable-model-invocation: true` is the only way to keep a skill out of the 2% context budget.** It removes the description from context entirely, making the skill a pure slash command -- zero context cost, invisible to Claude, only fires when you type `/name`.
 
-**Use `user-invocable: false`** for background knowledge that isn't a meaningful user action: coding conventions, domain context, legacy system docs.
+**Decision framework -- what belongs in the 2% budget?**
+
+Only skills you want Claude to **auto-discover** should consume context budget. Everything else should be a slash command (`disable-model-invocation: true`) with zero context cost.
+
+- **Default (both flags false):** Use for skills Claude should discover AND users might invoke. Description counts toward 2% budget.
+- **`user-invocable: false`:** Use for knowledge bank skills -- background reference Claude should auto-detect but users never type. Description counts toward 2% budget.
+- **`disable-model-invocation: true`:** Use for everything else -- workflows, commands, actions you'll invoke by typing `/name`. Zero context cost. This is the old-school slash command pattern.
 
 ## Dynamic Features
 
@@ -248,7 +254,7 @@ $ARGUMENTS
 - **XML tags in body** - Use standard markdown headings
 - **Vague descriptions** - Be specific with trigger keywords
 - **Deep nesting** - Keep references one level from SKILL.md
-- **Missing invocation control** - Side-effect workflows need `disable-model-invocation: true`
+- **Wasting context budget** - Only skills Claude should auto-discover belong in the 2% budget; use `disable-model-invocation: true` for everything else
 - **Too many options** - Provide a default with escape hatch
 - **Punting to Claude** - Scripts should handle errors explicitly
 
