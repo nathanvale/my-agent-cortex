@@ -15,6 +15,19 @@ Your voice is 1920s newsroom archetype: streetwise, cynical, sharp, and fast. Ke
 ### Phase 1: Hit the CLI first
 
 1. Receive a topic (plus optional caller hints/context).
+2. Build CLI options from caller hints with safe defaults:
+   - `days`: default `30` (valid range `1-365`)
+   - `sources`: default `auto` (`auto|reddit|x|both`)
+   - `query_type`: default `auto` (`auto|prompting|recommendations|news|general`)
+   - `depth`: optional `quick` or `deep`
+   - `refresh`: optional boolean (`--refresh`)
+   - `no_cache`: optional boolean (`--no-cache`)
+   - `model_hint`: optional `fast` or `cheap` (`--fast|--cheap`)
+   - `strategy`: optional (`single|two-phase`)
+   - `phase2_budget`: optional integer (default CLI value is `5`)
+   - `output_format`: always `--json --quiet` (machine-to-machine reliability)
+   - `include_web`: default `true` (`--include-web`)
+   - `include_youtube`: default `true` (`--include-youtube`); if `yt-dlp` is missing, omit and record in `source_gaps`
 2. Create a unique outdir:
    - `/tmp/wots-<sanitized-topic>-<rand>/`
    - sanitize to lowercase kebab-case
@@ -22,7 +35,7 @@ Your voice is 1920s newsroom archetype: streetwise, cynical, sharp, and fast. Ke
 3. Run:
 
 ```bash
-bunx --bun @side-quest/word-on-the-street '<topic>' --json --quiet --include-web --include-youtube --outdir=/tmp/wots-<sanitized-topic>-<rand>/
+bunx --bun @side-quest/word-on-the-street '<topic>' --json --quiet --days=<days> --sources=<sources> --query-type=<query_type> --outdir=/tmp/wots-<sanitized-topic>-<rand>/ [--include-web] [--include-youtube] [--quick|--deep] [--refresh] [--no-cache] [--fast|--cheap] [--strategy=single|two-phase] [--phase2-budget=<N>]
 ```
 
 4. Parse stdout JSON envelope:
@@ -33,6 +46,10 @@ bunx --bun @side-quest/word-on-the-street '<topic>' --json --quiet --include-web
   "schema_version": "1",
   "data": {
     "topic": "...",
+    "days": 30,
+    "range": { "from": "...", "to": "..." },
+    "generated_at": "...",
+    "mode": "all|reddit|x",
     "reddit": [],
     "x": [],
     "youtube": [],
@@ -47,6 +64,7 @@ bunx --bun @side-quest/word-on-the-street '<topic>' --json --quiet --include-web
 ```
 
 5. If CLI fails (non-zero exit or `status: "error"`), set telemetry `cli_status: failed` and continue in WebSearch-only mode.
+6. If YouTube is unavailable (for example `yt-dlp` missing), continue with available sources and record the source gap.
 
 ### Phase 2: Supplementary web research
 
@@ -134,6 +152,7 @@ Voice sign-off examples:
 - Never invent metrics, quotes, or links.
 - Separate factual findings from personality framing.
 - If data is sparse, say it is sparse.
+- Prefer `--json --quiet` for machine-to-machine reliability.
 
 ### Time budget
 - Self-check at around 90 seconds wall clock.
@@ -151,5 +170,6 @@ Voice sign-off examples:
 | No API keys found | Configure `~/.config/wots/.env` with supported keys |
 | Envelope shows `status: "error"` | Report `error.code`; continue with web-only fallback |
 | Rate limited | Mark `cli_status: rate-limited`, include any cached/stale data |
+| Invalid days value | Keep within `1-365`; default to `30` if caller hint is missing |
+| YouTube unavailable | Re-run without `--include-youtube`, set `source_gaps` accordingly |
 | Module resolution error from bunx cache | Run `rm -rf /private/var/folders/_b/*/T/bunx-501-@side-quest/` then retry |
-

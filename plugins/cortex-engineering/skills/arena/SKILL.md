@@ -1,6 +1,6 @@
 ---
 name: arena
-description: Adversarial research -- biased teams argue opposite sides, a judge delivers the verdict. Invoke explicitly via /cortex-engineering:arena or the Skill tool (disable-model-invocation is on). Use for comparing technologies, evaluating trade-offs, or resolving debates with structured evidence from Reddit, X, and the web.
+description: Adversarial research -- biased teams argue opposite sides, a judge delivers the verdict. Use for comparing technologies, evaluating trade-offs, or resolving debates with structured evidence from Reddit, X, and the web.
 argument-hint: "[topic | A vs B]"
 disable-model-invocation: true
 allowed-tools: Agent, Read, Glob, Grep, Write, Skill
@@ -58,7 +58,20 @@ Present the camps and wait for confirmation before dispatching:
 >
 > Sound right, or want to adjust the framing?
 
-### Step 3: Dispatch reporters
+### Step 3: Choose recency window (`days`) with routing
+
+Pick one window for the whole matchup and pass it to all reporters:
+
+| Topic pattern | Days |
+|---|---|
+| Breaking news, releases, incidents, "latest/today/this week" | `7` |
+| Fast-moving ecosystems (AI models, JS framework/runtime churn, security advisories) | `14` |
+| Default technology debates and trade-offs | `30` |
+| Slow-moving architecture/process debates (testing philosophy, team topology, monolith vs services) | `90` |
+
+If unclear, use `30`. If user explicitly asks for a range, always honor that override.
+
+### Step 4: Dispatch reporters
 
 Go to [Dispatch Beat Reporters](#dispatch-beat-reporters).
 
@@ -98,7 +111,12 @@ Find a previous arena research doc:
 >
 > Pick one to re-run with fresh evidence, or give me a new matchup.
 
-Once selected, extract the original camps from the doc and go to [Dispatch Beat Reporters](#dispatch-beat-reporters) with the same framing.
+Once selected, extract the original camps from the doc and choose `days` using this rematch rule:
+- If the prior arena doc states a days window, reuse it by default.
+- If the user asks for fresher coverage, use `7` or `14`.
+- If the prior doc has no days metadata, route with the standard table in Fight Step 3.
+
+Then go to [Dispatch Beat Reporters](#dispatch-beat-reporters) with the same framing and chosen `days`.
 
 ---
 
@@ -114,6 +132,7 @@ They believe [POSITION] is the best approach and the alternatives are inferior.
 
 Your job: Find the STRONGEST evidence supporting Team [LETTER]'s position.
 Emphasize evidence that supports [POSITION], and de-emphasize evidence that undermines it.
+Use a search window of [DAYS] days (`--days=[DAYS]`).
 
 Search Reddit, X/Twitter, and the web for:
 1. Arguments FOR [POSITION]
@@ -181,7 +200,20 @@ Team B: [total]/25
 have genuine strengths? What's the pragmatic answer?]
 ```
 
+For **three-camp matchups** (X vs Y vs Z), use the same format with Team C added to each round. The final score becomes `[total]/25` for each of three teams.
+
 Keep the personality of a staff engineer who enjoys a good debate -- witty but rigorous. The scores must be honest, not diplomatic ties.
+
+---
+
+## Success Criteria
+
+A good arena verdict meets these bars:
+
+- Every score has a concrete justification (not "Team A is slightly better")
+- At least 3 of 5 rounds cite specific data points from the reporters
+- The final verdict names a winner (no diplomatic ties unless the data genuinely splits)
+- Open Questions section surfaces at least one unresolved tension worth future research
 
 ---
 
