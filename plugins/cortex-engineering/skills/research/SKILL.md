@@ -59,7 +59,7 @@ Use available tools based on the topic:
 
 | Need | Tool |
 |------|------|
-| Community opinions, trends | WebSearch (for deeper community intel, suggest the user dispatch `/arena` or the `cortex-engineering:beat-reporter` agent separately) |
+| Community opinions, trends | WebSearch for quick lookups; for deeper community intel, dispatch `cortex-engineering:beat-reporter` via the Task tool |
 | Web content at a specific URL | WebFetch |
 | General web search | WebSearch |
 | Codebase exploration | Grep, Glob, Read |

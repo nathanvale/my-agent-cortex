@@ -1,6 +1,6 @@
 ---
 name: arena
-description: Adversarial research -- biased teams argue opposite sides, a judge delivers the verdict. Use when comparing technologies, evaluating trade-offs, or resolving debates with structured evidence from Reddit, X, and the web.
+description: Adversarial research -- biased teams argue opposite sides, a judge delivers the verdict. Invoke explicitly via /cortex-engineering:arena or the Skill tool (disable-model-invocation is on). Use for comparing technologies, evaluating trade-offs, or resolving debates with structured evidence from Reddit, X, and the web.
 argument-hint: "[topic | A vs B]"
 disable-model-invocation: true
 allowed-tools: Agent, Read, Glob, Grep, Write, Skill
