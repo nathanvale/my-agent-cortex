@@ -59,11 +59,10 @@ Use available tools based on the topic:
 
 | Need | Tool |
 |------|------|
-| Community opinions, trends | Dispatch `cortex-engineering:beat-reporter` via Agent tool |
+| Community opinions, trends | WebSearch (for deeper community intel, suggest the user dispatch `/arena` or the `cortex-engineering:beat-reporter` agent separately) |
 | Web content at a specific URL | WebFetch |
 | General web search | WebSearch |
 | Codebase exploration | Grep, Glob, Read |
-| Deep multi-source research | Task tool with `cortex-engineering:beat-reporter` in parallel |
 
 **Build on existing knowledge** -- don't repeat what cortex already has. Focus research on gaps and new angles.
 

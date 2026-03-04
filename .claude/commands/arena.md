@@ -98,7 +98,7 @@ Once selected, extract the original camps from the doc and go to [Dispatch Beat 
 
 ## Dispatch Beat Reporters
 
-Launch one `newsroom:beat-reporter` agent per camp, **all in parallel** using the Agent tool with `run_in_background: true`.
+Launch one `cortex-engineering:beat-reporter` agent per camp, **all in parallel** using the Agent tool with `run_in_background: true`.
 
 ### Reporter Brief Template
 
