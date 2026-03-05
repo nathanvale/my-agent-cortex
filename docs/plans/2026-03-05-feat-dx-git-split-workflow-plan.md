@@ -8,11 +8,73 @@ origin: docs/research/2026-03-05-arena-merge-vs-squash-agentic-coding.md
 
 # feat: Add /dx-git:split workflow
 
+## Enhancement Summary
+
+**Deepened on:** 2026-03-05  
+**Sections enhanced:** 9  
+**Research agents used:** `best-practices-researcher`, `framework-docs-researcher`, `architecture-strategist`, `security-sentinel`, `performance-oracle`, `code-simplicity-reviewer`, `pattern-recognition-specialist`, `spec-flow-analyzer`, `repo-research-analyst`, `learnings-researcher`
+
+### Key Improvements
+
+1. Added an execution-safe apply pipeline (`git apply --check` then `git apply --3way`) with deterministic rollback behavior.
+2. Added explicit edge-case handling for renames, binary patches, empty branches, and unassigned/deleted files.
+3. Added contract/test updates to keep command frontmatter, workflow references, and safety-hook expectations in sync.
+
+### New Considerations Discovered
+
+- Use `git switch -c <branch> <start-point>` consistently to avoid ambiguous checkout behavior and align with modern Git guidance.
+- Preserve CLI-first workflow architecture (no MCP escalation) unless cross-client/stateful/schema-critical triggers appear (see `docs/solutions/logic-errors/cli-vs-mcp-open-questions-decision-framework-20260304.md`).
+
+## Section Manifest
+
+Section 1: Overview + Problem Statement - Validate demand/fit and outcome metrics for split workflow adoption.  
+Section 2: Proposed Solution + Interaction Model - Improve UX prompts, branch/file assignment flow, and dry-run clarity.  
+Section 3: Technical Considerations - Harden patch apply strategy, branch safety, and rollback guarantees.  
+Section 4: Acceptance Criteria - Add verifiable safety and behavior assertions (edge cases and failures).  
+Section 5: Implementation Order - Add guardrail tests and command/workflow contract updates.  
+Section 6: Verification - Expand test matrix for conflict, rename, and dirty-tree scenarios.  
+Section 7: Sources - Add authoritative Git/GitHub references and institutional learnings.
+
+## Quick Start
+
+```bash
+/dx-git:split            # preview split plan (no mutations)
+/dx-git:split --confirm  # execute split branches
+# On each created branch:
+/dx-git:commit-push-pr
+```
+
 ## Overview
 
 Add a `/dx-git:split` command to the dx-git plugin that helps split a WIP-heavy feature branch into multiple clean feature branches. The key insight from the arena research: **split before you squash** -- once you squash, you lose the granularity needed to split.
 
 This solves the common agentic coding scenario: you've been heads-down, WIP checkpoints piling up, and you realize the work is actually 2-3 separate PRs. Today you'd have to manually cherry-pick or soft-reset -- error-prone and easy to lose work. This command makes it safe and guided.
+
+### Research Insights
+
+**Best Practices:**
+- Keep split output branches narrowly scoped (single concern per branch) to reduce PR review overhead and merge risk.
+- Preserve default command ergonomics used in existing dx-git commands: preview first, mutate only on explicit confirm.
+- Keep the workflow CLI-native and stateless (matches current plugin architecture and avoids unnecessary orchestration complexity).
+
+**Performance Considerations:**
+- Compute merge-base once and reuse it through the entire run to avoid repeated graph traversal.
+- Collect file stats with one `git diff --name-status` pass, then derive prompts from that dataset.
+
+**Implementation Details:**
+```bash
+DEFAULT_BRANCH=<detected-default-branch>
+BASE=$(git merge-base "$DEFAULT_BRANCH" HEAD)
+git diff --name-status "$BASE..HEAD"
+```
+
+**Edge Cases:**
+- If `BASE == HEAD`, stop with a clear no-op message: no branch-local work to split.
+- If only one logical group exists after assignment, suggest `/dx-git:squash` instead of split.
+
+**References:**
+- https://git-scm.com/docs/git-merge-base
+- https://git-scm.com/docs/git-diff
 
 ## Problem Statement
 
@@ -32,6 +94,29 @@ WIP commits piling up
 ```
 
 The "multiple PRs" path has no tooling today. The `/squash` command handles the single-PR case. This command handles the split case.
+
+### Research Insights
+
+**Best Practices:**
+- Define success metrics up front: split completion rate, rollback rate, and average PR size reduction.
+- Keep the mental model “group by outcome, not commit history” explicit throughout prompts.
+
+**Performance Considerations:**
+- Prompt users with path-grouped summaries (directory clusters) before file-level assignment to reduce cognitive load in large diffs.
+
+**Implementation Details:**
+```bash
+git log --oneline "$BASE..HEAD"
+git diff --stat "$BASE..HEAD"
+```
+
+**Edge Cases:**
+- Large branches (100+ files) need pagination/partitioning in prompts.
+- Generated files should be grouped or excluded by default to avoid accidental branch pollution.
+
+**References:**
+- https://git-scm.com/docs/git-log
+- https://git-scm.com/docs/git-diff
 
 ## Proposed Solution
 
@@ -105,15 +190,39 @@ Backup ref: split-backup/feat/big-feature/20260305-1430
 Run /dx-git:split --confirm to execute.
 ```
 
+### Research Insights
+
+**Best Practices:**
+- Validate branch names before execution (`git check-ref-format --branch`) to avoid invalid refs and command injection-style input abuse.
+- Require explicit handling for unassigned files: block execution unless user confirms skip list.
+- Show `base` branch and merge-base hash in both survey and dry-run to make the patch scope auditable.
+
+**Performance Considerations:**
+- Build dry-run branch stats from cached per-group diff outputs instead of recomputing all groups multiple times.
+
+**Implementation Details:**
+```bash
+git check-ref-format --branch "$TARGET_BRANCH"
+git diff --stat "$BASE..HEAD" -- "${GROUP_FILES[@]}"
+```
+
+**Edge Cases:**
+- Duplicate file assignment should fail fast with a single conflict report before execution.
+- Deleted files in one group and modified files in another group should trigger a hard error in v1.
+
+**References:**
+- https://git-scm.com/docs/git-check-ref-format
+- https://git-scm.com/docs/git-diff
+
 ## Technical Considerations
 
 ### Apply Strategy
 
 For WIP-heavy branches (the primary use case), commit boundaries are noise. The approach:
 
-1. Compute the total diff from merge-base to HEAD: `git diff $(git merge-base main HEAD)..HEAD`
+1. Detect default branch (`DEFAULT_BRANCH`), then compute the total diff from merge-base to HEAD: `git diff $(git merge-base "$DEFAULT_BRANCH" HEAD)..HEAD`
 2. For each target branch, extract the diff for assigned files: `git diff <merge-base>..HEAD -- <file1> <file2> ...`
-3. Create branch from main: `git checkout -b <branch-name> main`
+3. Create branch from default branch: `git switch -c <branch-name> <default-branch>`
 4. Apply the diff: `git apply`
 5. Stage and commit with a clean conventional commit message
 
@@ -126,17 +235,17 @@ Commands the split workflow needs, checked against `git-safety.ts`:
 | Command | Blocked? | Notes |
 |---------|----------|-------|
 | `git diff <base>..HEAD -- <files>` | No | Read-only |
-| `git merge-base main HEAD` | No | Read-only |
+| `git merge-base <default-branch> HEAD` | No | Read-only |
 | `git log --oneline <base>..HEAD` | No | Read-only |
-| `git checkout -b <name> main` | No | Creates new branch |
+| `git switch -c <name> <default-branch>` | No | Creates new branch |
 | `git apply` | No | Not in blocked list |
 | `git add <specific files>` | No | Specific files allowed |
 | `git commit -m ...` | No | On feature branch |
 | `git branch split-backup/...` | No | Creates ref |
 | `git stash` | No | Stash is allowed |
-| `git checkout <original-branch>` | **Yes** | Blocked by `checkout <ref> -- <path>` rule |
+| `git switch <original-branch>` | No | Safe branch switch |
 
-**Workaround for checkout:** Use `git switch <branch>` instead of `git checkout <branch>`. The safety hook blocks `git checkout <ref> -- <path>` (file extraction pattern) but `git switch` is not in the blocked list and is the modern equivalent for branch switching.
+**Checkout rule clarity:** Avoid `git checkout` entirely in this workflow. Use `git switch` commands for branch creation and switching. The safety hook blocks file-extraction forms like `git checkout <ref> -- <path>`.
 
 ### Backup and Rollback
 
@@ -172,6 +281,47 @@ Assigning entire file to one group. Which group should own it?
 
 File-level assignment is enforced. Hunk-level splitting is deferred to v2.
 
+### Research Insights
+
+**Best Practices:**
+- Replace `git checkout -b` with `git switch -c` for clearer branch intent and modern command semantics.
+- Preflight each group patch with `git apply --check` before mutation; apply with `git apply --3way` to improve resilience against context drift.
+- Use `--` pathspec separator consistently when constructing file-scoped diffs.
+
+**Performance Considerations:**
+- Avoid regenerating full diffs in each branch loop; generate group patch once and reuse during dry-run + confirm execution.
+- Use NUL-delimited file capture when possible in shell loops to avoid path parsing failures on spaces/special chars.
+
+**Implementation Details:**
+```bash
+DEFAULT_BRANCH=<detected-default-branch>
+BASE=$(git merge-base "$DEFAULT_BRANCH" HEAD)
+
+# Build patch per group safely
+PATCH_FILE="/tmp/dx-git-split-$GROUP.patch"
+git diff "$BASE..HEAD" -- "${GROUP_FILES[@]}" > "$PATCH_FILE"
+
+# Preflight + apply
+if git apply --check "$PATCH_FILE"; then
+  git apply --3way "$PATCH_FILE"
+else
+  echo "Patch preflight failed for $GROUP"
+  exit 1
+fi
+
+git switch -c "$GROUP_BRANCH" "$DEFAULT_BRANCH"
+```
+
+**Edge Cases:**
+- Binary changes can make patch inspection harder; fail with explicit guidance if `git apply` rejects unsupported patch chunks.
+- Renames/copies may need explicit v1 constraint messaging if patch mapping becomes ambiguous.
+- If branch already exists, fail fast and require rename (no implicit force-reset behavior).
+
+**References:**
+- https://git-scm.com/docs/git-apply
+- https://git-scm.com/docs/git-switch
+- https://git-scm.com/docs/git-diff
+
 ## Acceptance Criteria
 
 - [ ] `/dx-git:split` command exists and delegates to workflow skill
@@ -185,6 +335,35 @@ File-level assignment is enforced. Hunk-level splitting is deferred to v2.
 - [ ] Clear error if fewer than 2 or more than 5 target branches requested
 - [ ] Unassigned files detected and reported
 - [ ] Summary printed with branch names, file counts, and diff stats
+- [ ] Error messages use stable templates:
+  - `Cannot run /dx-git:split on <branch>. Switch to a feature branch.`
+  - `Expected 2-5 target branches, got <n>.`
+  - `Unassigned files remain: <files>. Assign or confirm skip.`
+
+### Research Insights
+
+**Best Practices:**
+- Add explicit criteria for patch preflight and failure behavior.
+- Add criteria for branch name validation and duplicate file assignment rejection.
+
+**Performance Considerations:**
+- Add a runtime target for interactive runs (for example: under 5 seconds for 30 files on local repos).
+
+**Implementation Details:**
+```markdown
+- [ ] `git apply --check` passes for every target branch before mutating any branch
+- [ ] Invalid branch names are rejected via `git check-ref-format --branch`
+- [ ] Duplicate file assignments are rejected before dry-run summary
+- [ ] Existing target branches cause deterministic failure with remediation guidance
+```
+
+**Edge Cases:**
+- Empty group after reassignment should block execution.
+- Deleted files must be represented correctly in per-branch commit outcomes.
+
+**References:**
+- https://git-scm.com/docs/git-apply
+- https://git-scm.com/docs/git-check-ref-format
 
 ## Implementation Order
 
@@ -210,7 +389,7 @@ name: split
 description: Split a WIP-heavy branch into multiple clean feature branches
 model: sonnet
 argument-hint: [--confirm]
-allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git status:*), Bash(git merge-base:*), Bash(git branch:*), Bash(git checkout -b:*), Bash(git switch:*), Bash(git apply:*), Bash(git reset --soft:*), Bash(git add:*), Bash(git commit:*), Bash(git show:*), Bash(git stash:*)
+allowed-tools: Bash(git log:*), Bash(git diff:*), Bash(git status:*), Bash(git merge-base:*), Bash(git branch:*), Bash(git switch:*), Bash(git apply:*), Bash(git add:*), Bash(git commit:*), Bash(git stash:*), Bash(git check-ref-format:*)
 ---
 
 Use the **workflow** skill to split the current branch into multiple feature branches.
@@ -223,12 +402,38 @@ $ARGUMENTS
 Add row to SKILL.md routing table:
 
 ```
-| Split into multiple branches | workflows.md § Split | git diff, git apply, git checkout -b, git branch |
+| Split into multiple branches | workflows.md § Split | git diff, git apply, git switch -c, git check-ref-format |
 ```
 
 ### Phase 4: Plugin manifest update (~5 min)
 
-Add `"./commands/split.md"` to `plugin.json` commands array.
+Add `"./commands/split.md"` to `plugins/dx-git/.claude-plugin/plugin.json` `commands` array.
+
+### Research Insights
+
+**Best Practices:**
+- Also update workflow-contract tests to include new command/tool permissions where needed.
+- Keep `allowed-tools` minimal: include only commands used by the split flow.
+- Align command docs with existing phrasing style in other dx-git command files.
+
+**Performance Considerations:**
+- Consolidate pre-flight checks (base branch detection, merge-base, status) into one pass.
+
+**Implementation Details:**
+```markdown
+Phase 5 (tests, ~20 min)
+1. Add/extend `plugins/dx-git/hooks/command-workflow-contract.test.ts`
+2. Add split safety coverage in `plugins/dx-git/hooks/git-safety.test.ts` if command patterns are new
+3. Add workflow doc assertions for `## Split` heading and key command patterns
+```
+
+**Edge Cases:**
+- Ensure command works in headless mode where prompt responses are unavailable (must fail safely, not mutate silently).
+- Ensure command behavior is deterministic when default branch is not `main`.
+
+**References:**
+- https://git-scm.com/docs/git-switch
+- https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request
 
 ## Verification
 
@@ -241,6 +446,34 @@ Add `"./commands/split.md"` to `plugin.json` commands array.
    - Each target branch compiles independently
 4. Run `/dx-git:commit-push-pr` on each split branch to verify they integrate with existing workflow
 
+### Research Insights
+
+**Best Practices:**
+- Add failure-path verification, not just happy-path verification.
+- Verify branch-level isolation by checking each split branch has only assigned file changes against the detected default branch.
+
+**Performance Considerations:**
+- Track execution latency for dry-run and confirm modes on medium-size branches (10-50 files).
+
+**Implementation Details:**
+```bash
+# Isolation check example for each split branch
+git switch feat/oauth
+git diff --name-only main...HEAD
+
+# Backup ref check
+git show-ref --verify refs/heads/split-backup/feat/big-feature/20260305-1430
+```
+
+**Edge Cases:**
+- Dirty working tree at invocation should auto-checkpoint or hard-fail with actionable message.
+- Simulate `git apply --check` failure and confirm rollback leaves original branch and backup intact.
+- Validate behavior when one target branch name already exists locally/remotely.
+
+**References:**
+- https://git-scm.com/docs/git-show-ref
+- https://git-scm.com/docs/git-apply
+
 ## Sources
 
 - **Origin research:** [docs/research/2026-03-05-arena-merge-vs-squash-agentic-coding.md](docs/research/2026-03-05-arena-merge-vs-squash-agentic-coding.md) -- "preserve full history on feature branches, squash when merging to main"
@@ -248,3 +481,6 @@ Add `"./commands/split.md"` to `plugin.json` commands array.
 - **Existing workflow patterns:** `/dx-git:squash` (7-step soft reset), `/dx-git:commit-push-pr` (6-phase pipeline with WIP detection), `/dx-git:clean-gone` (dry-run-then-confirm pattern)
 - **SFEIR Institute:** 15-30 micro-commits per agent session, 55% review slowdown
 - **SpecFlow analysis:** file-level grouping sufficient for v1; `git diff | git apply` avoids cherry-pick conflicts; backup ref pattern for safety
+- **Internal learnings:** [docs/solutions/integration-issues/worktree-validation-and-hook-test-environment-system-20260302.md](docs/solutions/integration-issues/worktree-validation-and-hook-test-environment-system-20260302.md) (deterministic tooling/test behavior), [docs/solutions/logic-errors/cli-vs-mcp-open-questions-decision-framework-20260304.md](docs/solutions/logic-errors/cli-vs-mcp-open-questions-decision-framework-20260304.md) (CLI-first decision framework)
+- **Git docs:** https://git-scm.com/docs/git-apply, https://git-scm.com/docs/git-switch, https://git-scm.com/docs/git-merge-base, https://git-scm.com/docs/git-diff, https://git-scm.com/docs/git-check-ref-format, https://git-scm.com/docs/git-show-ref
+- **GitHub docs:** https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request
