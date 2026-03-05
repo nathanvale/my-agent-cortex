@@ -1,7 +1,7 @@
 {
 	"name": "cortex-engineering",
 	"description": "Agent-native knowledge system. Research topics and capture findings as structured markdown documents with YAML frontmatter",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"author": {
 		"name": "Nathan Vale"
 	},
@@ -22,8 +22,10 @@
 		"./skills/skill-authoring",
 		"./skills/mermaid-diagrams",
 		"./skills/naming-conventions",
-		"./skills/design-system"
+		"./skills/design-system",
+		"./skills/arena"
 	],
+	"agents": ["./agents/beat-reporter.md"],
 	"commands": [
 		"./commands/research.md",
 		"./commands/add.md",

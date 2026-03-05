@@ -59,11 +59,10 @@ Use available tools based on the topic:
 
 | Need | Tool |
 |------|------|
-| Community opinions, trends | `/newsroom:investigate` via Skill tool |
+| Community opinions, trends | WebSearch for quick lookups; for deeper community intel, dispatch `cortex-engineering:beat-reporter` via the Task tool |
 | Web content at a specific URL | WebFetch |
 | General web search | WebSearch |
 | Codebase exploration | Grep, Glob, Read |
-| Deep multi-source research | Task tool with beat-reporter agent |
 
 **Build on existing knowledge** -- don't repeat what cortex already has. Focus research on gaps and new angles.
 

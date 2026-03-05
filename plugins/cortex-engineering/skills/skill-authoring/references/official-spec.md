@@ -36,8 +36,8 @@ All fields are optional. Only `description` is recommended.
 | `name` | No | Display name. Lowercase letters, numbers, hyphens only (max 64 chars). Defaults to directory name if omitted. |
 | `description` | Recommended | What it does AND when to use it (max 1024 chars). Claude uses this to decide when to apply the skill. |
 | `argument-hint` | No | Hint shown during autocomplete. Example: `[issue-number]` or `[filename] [format]` |
-| `disable-model-invocation` | No | Set `true` to prevent Claude from auto-loading. Use for manual workflows. Default: `false` |
-| `user-invocable` | No | Set `false` to hide from `/` menu. Use for background knowledge. Default: `true` |
+| `disable-model-invocation` | No | Set `true` to make a pure slash command (zero context cost, invisible to Claude). Default: `false` |
+| `user-invocable` | No | Set `false` to hide from `/` menu. Only use for knowledge bank skills. Default: `true` |
 | `allowed-tools` | No | Tools Claude can use without permission prompts. Example: `Read, Bash(git *)` |
 | `model` | No | Model to use: `haiku`, `sonnet`, or `opus` |
 | `context` | No | Set `fork` to run in isolated subagent context |
